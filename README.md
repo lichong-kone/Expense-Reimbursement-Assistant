@@ -73,38 +73,26 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 > **什么是 Skill**：一个带 YAML frontmatter（`name`、`description`）的 `SKILL.md` 加同目录逻辑/资源文件。安装就是把该目录放到宿主读取 skills 的位置（Kiro `~/.kiro/skills/`；部分宿主 `~/.agents/skills/`；或宿主的导入界面）。
 
-## 1. 安装（本仓库已含文件）
+## 一条命令走完全流程
+
+只需克隆一次，然后**反复运行同一条命令**——脚本会自动判断当前该做哪一步（建骨架 → 处理 → 应用决定）：
 
 ```bash
 git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
+cd Expense-Reimbursement-Assistant
 
-# 方式 A：一键脚本（自动探测宿主 skills 目录）
-bash Expense-Reimbursement-Assistant/install.sh                 # 装通用 Skill
-bash Expense-Reimbursement-Assistant/install.sh --dest ~/.agents/skills
-bash Expense-Reimbursement-Assistant/install.sh --skill both    # 通用 + 服务型都装
-
-# 方式 B：手动复制整目录
-cp -R Expense-Reimbursement-Assistant/skills/kone-expense-reimbursement <你的宿主 skills 目录>/
+bash reimburse.sh 我的报销.json
 ```
 
-> 必须整体复制目录，尤其 `resources/`（政策规则）。装好后重启/刷新宿主。
+- **第 1 次**：文件不存在 → 生成可编辑骨架 `我的报销.json`，填入员工/行程/已提取发票文本。
+- **第 2 次**（再次运行同一命令）：校验并生成审核包 `我的报销-output/`（`summary.md`、超标问题、决定模板等）。若有超标/待确认项，编辑 `我的报销-output/review-decisions.template.json` 的每项 `action`（`keep`/`adjust`/`exempt`+原因/`provide_info`/`defer`）。
+- **第 3 次**（再次运行同一命令）：检测到决定已填 → 自动应用，产出最终结果 `我的报销-reviewed/`（含实际/可报销总额、已应用决定）。
 
-## 2. 整理与审核
+需要 Node.js ≥ 18；零外部依赖；全程离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
 
-```bash
-cd <你的宿主 skills 目录>/kone-expense-reimbursement
-node portable-core.mjs --init ./my-reimbursement.json             # 生成可编辑输入骨架
-node portable-core.mjs --validate --input ./my-reimbursement.json  # 校验
-node portable-core.mjs --input ./my-reimbursement.json --output-dir ./output  # 生成审核包
-node portable-core.mjs \
-  --input ./my-reimbursement.json \
-  --decisions ./output/review-decisions.template.json \
-  --output-dir ./output-reviewed                                   # 填写决定后再运行
-```
+> **要把 Skill 注册进你的 Agent 宿主**（让宿主自动发现并编排），再运行一次：`bash install.sh`（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或用 `--dest` 指定）。这一步是可选的，不影响上面的命令行使用。
 
-输出 `summary.md`、政策报告、审核问题、`review-decisions.template.json`、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。超标可选**按标准封顶**或**按实际报销（需填原因）**；`exempt` 必填原因；`adjust`/`provide_info` 必填字段补丁；`defer` 仅记录。
-
-## 3. 关于正式 Excel
+## 关于正式 Excel
 
 本公开包**不生成公司官方模板的正式 Excel**（官方模板与物理映射属公司内部受控资产，不在本仓库）。它输出 `template-input.json` / `host-contract.json` 等结构化结果，供宿主渲染或由公司内部适配器生成正式《费用报销单》。
 
