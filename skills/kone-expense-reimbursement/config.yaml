@@ -1,0 +1,79 @@
+# WorkBuddy / 通用 Agent Skill Configuration
+# kone-expense-reimbursement v1.3.0 (public / universal)
+
+skill:
+  id: kone-expense-reimbursement
+  name: KONE Expense Reimbursement (Universal Skill)
+  version: 1.3.0
+  mode: portable
+
+triggers:
+  - intent: expense_reimbursement
+    patterns:
+      - "整理报销"
+      - "生成报销单"
+      - "报销发票"
+      - "fill reimbursement"
+      - "报销这些发票"
+      - "填报销申请表"
+  - intent: policy_check
+    patterns:
+      - "检查政策"
+      - "check policy"
+      - "超标了吗"
+      - "是否合规"
+
+execution:
+  runtime: node
+  minVersion: "18"
+  entryPoint: portable-core.mjs
+  timeout: 30s
+  sandbox: true
+
+cli:
+  init: "--init <path>"
+  validate: "--validate --input <path>"
+  run: "--input <path> [--output-dir <dir>] [--decisions <path>]"
+
+resources:
+  policyRules: resources/policy-rules.json
+
+outputs:
+  directory: output/
+  artifacts:
+    - summary.md
+    - reimbursement-draft.json
+    - policy-report.json
+    - policy-findings.json
+    - review-questions.md
+    - review-questions.json
+    - review-decisions.template.json
+    - decision-log.json
+    - template-input.json
+    - host-contract.json
+    - audit.ndjson
+    - manifest.json
+
+permissions:
+  network: false
+  filesystem: read_write_output_only
+  secrets: none
+
+hostResponsibilities:
+  - "PDF/OFD/XML file parsing and text extraction"
+  - "File storage and access control"
+  - "User authentication and session management"
+  - "Rendering the final document from template-input.json / host-contract.json"
+
+distribution:
+  notice: >
+    Public package: policy + organization + review + structured outputs only.
+    The company's official Excel template, physical cell mappings, and template
+    adapter are company-internal and are NOT included in this public package.
+  officialExcelRendering: company-internal
+
+metadata:
+  company: KONE/通力
+  domain: expense_reimbursement
+  locale: zh-CN
+  templateDistribution: false

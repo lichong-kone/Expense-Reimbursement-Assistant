@@ -1,0 +1,135 @@
+{
+  "id": "kone-expense-reimbursement",
+  "name": "KONE Expense Reimbursement (Universal Skill)",
+  "version": "1.3.0",
+  "description": "Universal, platform-neutral skill for KONE/通力 expense reimbursement: invoice field extraction, city-tier normalization, date-based aggregation, policy compliance checks with settlement options (cap_to_standard / claim_actual_with_reason), decision workflow, structured outputs (template-input.json / host-contract.json), and reimbursement draft generation. Zero external dependencies. This public package does NOT generate the company's official Excel; formal official-template rendering is a company-internal capability provided separately.",
+  "author": "REBU Team",
+  "license": "UNLICENSED",
+  "type": "portable",
+  "runtime": {
+    "engine": "node>=18",
+    "dependencies": []
+  },
+  "capabilities": [
+    "invoice_field_extraction",
+    "invoice_status_derivation",
+    "city_tier_normalization",
+    "date_based_aggregation",
+    "meal_policy_check",
+    "hotel_policy_check",
+    "rail_class_check",
+    "settlement_options",
+    "reimbursement_draft_generation",
+    "policy_report_generation",
+    "template_input_generation",
+    "host_contract_generation",
+    "review_questions_generation",
+    "decision_validation",
+    "decision_application",
+    "audit_trail"
+  ],
+  "entryPoint": "portable-core.mjs",
+  "cli": {
+    "init": "--init <path>",
+    "validate": "--validate --input <path>",
+    "run": "--input <path> [--output-dir <dir>] [--decisions <path>]"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "type": "json_file",
+      "required": true,
+      "description": "JSON file conforming to PortableSkillInput schema: employee profile + invoice list with rawText/emailSubject/fileName/preParsed"
+    },
+    {
+      "name": "decisions",
+      "type": "json_file",
+      "required": false,
+      "description": "JSON file with user decisions answering review questions (DecisionInput[] schema)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "summary",
+      "type": "markdown",
+      "description": "Human-readable processing summary with actual/reimbursable totals, policy status, and next steps",
+      "filePath": "output/summary.md"
+    },
+    {
+      "name": "reimbursement-draft",
+      "type": "json",
+      "description": "Structured draft with extracted fields, statuses, aggregation groups, actual and reimbursable totals",
+      "filePath": "output/reimbursement-draft.json"
+    },
+    {
+      "name": "policy-report",
+      "type": "json",
+      "description": "Policy compliance check results per invoice",
+      "filePath": "output/policy-report.json"
+    },
+    {
+      "name": "policy-findings",
+      "type": "json",
+      "description": "Policy findings with explicit confirmation requirements",
+      "filePath": "output/policy-findings.json"
+    },
+    {
+      "name": "review-questions",
+      "type": "markdown",
+      "description": "Human-readable review questions for items needing confirmation",
+      "filePath": "output/review-questions.md"
+    },
+    {
+      "name": "review-questions-structured",
+      "type": "json",
+      "description": "Machine-readable review questions with settlement options and amount impact",
+      "filePath": "output/review-questions.json"
+    },
+    {
+      "name": "review-decisions.template",
+      "type": "json",
+      "description": "Pre-filled decision template for users to complete and pass back via --decisions",
+      "filePath": "output/review-decisions.template.json"
+    },
+    {
+      "name": "decision-log",
+      "type": "json",
+      "description": "Audit log of applied decisions (only present when --decisions supplied)",
+      "filePath": "output/decision-log.json"
+    },
+    {
+      "name": "template-input",
+      "type": "json",
+      "description": "Structured data with contractVersion for host Excel rendering; limited categories aggregated by date, transport per-ticket",
+      "filePath": "output/template-input.json"
+    },
+    {
+      "name": "host-contract",
+      "type": "json",
+      "description": "Versioned logical template contract defining header, detail row types, and field semantics. No physical template, cell coordinates, or OOXML. Host adapter maps to authorized template.",
+      "filePath": "output/host-contract.json"
+    },
+    {
+      "name": "audit",
+      "type": "ndjson",
+      "description": "Append-only audit trail of all processing actions",
+      "filePath": "output/audit.ndjson"
+    },
+    {
+      "name": "output-manifest",
+      "type": "json",
+      "description": "OutputManifest containing skill/policy/host-contract versions, relative file refs, and SHA-256 hashes",
+      "filePath": "output/manifest.json"
+    }
+  ],
+  "hostResponsibilities": [
+    "PDF/OFD/XML file parsing and text extraction",
+    "File storage and access control",
+    "User authentication and session management",
+    "Rendering the final document from template-input.json / host-contract.json (the company's official-template Excel is generated by a company-internal adapter, not included in this public package)"
+  ],
+  "distribution": {
+    "notice": "Public package: policy + organization + review + structured outputs only. The company's official Excel template, physical cell mappings, and template adapter are company-internal and are NOT included here.",
+    "officialExcelRendering": "company-internal"
+  }
+}

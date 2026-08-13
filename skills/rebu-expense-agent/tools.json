@@ -1,0 +1,546 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/tools-list.json",
+  "_generated": "2026-08-11T03:53:04.207Z",
+  "_source": "dist/mcp/rebu-mcp-server.js (tools/list via stdio)",
+  "_count": 32,
+  "tools": [
+    {
+      "name": "rebu_start_session",
+      "description": "【开场·一次调用】返回认证状态 + 配置就绪 + 收件箱/待办概览 + 建议的 nextStep（authenticate/onboarding/triage/idle）。连接后先调用它，用一次往返就能向用户汇报全局并决定下一步。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_auth_status",
+      "description": "【认证·先调用】检查当前是否已认证（有可用的本地缓存令牌）。未认证时提示需要向用户索取账号密码。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_authenticate",
+      "description": "【认证】用用户提供的账号密码登录；账号不存在则自动注册再登录，成功后令牌本地缓存（后续运行免输）。首次使用、rebu_auth_status 显示未认证时调用。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "用户想使用的账号"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码（≥6 位）"
+          },
+          "name": {
+            "type": "string",
+            "description": "姓名（新注册用；省略则用账号名占位，可后续在 rebu_update_profile 完善）"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      }
+    },
+    {
+      "name": "rebu_logout",
+      "description": "【认证】清除本地缓存的登录状态。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_get_setup_status",
+      "description": "【设置·先调用】检查用户是否已完成配置：是否绑定邮箱、员工元数据是否填全（name/employeeNo/department/costCenter）。返回 ready 与缺失项。新连接应先调用它决定是否需要 onboarding。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_list_mailboxes",
+      "description": "【设置】列出已绑定的邮箱账号。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_add_mailbox",
+      "description": "【设置】绑定一个邮箱（IMAP）。收票来源。密码/授权码为敏感信息，仅在用户提供后传入。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "邮箱地址"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码或授权码（IMAP 授权码）"
+          },
+          "provider": {
+            "type": "string",
+            "description": "服务商标识，如 qq / 163 / gmail / custom"
+          },
+          "host": {
+            "type": "string",
+            "description": "IMAP 服务器（provider=custom 时必填），如 imap.exmail.qq.com"
+          },
+          "port": {
+            "type": "integer",
+            "description": "IMAP 端口，通常 993"
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "是否 SSL/TLS，通常 true"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "provider"
+        ]
+      }
+    },
+    {
+      "name": "rebu_test_mailbox",
+      "description": "【设置】测试已绑定邮箱的连通性。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailboxId": {
+            "type": "integer",
+            "description": "邮箱账号 id"
+          }
+        },
+        "required": [
+          "mailboxId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_get_profile",
+      "description": "【设置】查看员工元数据（姓名/工号/部门/成本中心等）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_update_profile",
+      "description": "【设置】更新员工元数据。fields 可含 name/employeeNo/employeeType/department/title/costCenter/dailyMealLimit/dailyHotelLimit/defaultTripPurpose。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "description": "要更新的员工元数据键值对"
+          }
+        },
+        "required": [
+          "fields"
+        ]
+      }
+    },
+    {
+      "name": "rebu_sync_inbox",
+      "description": "【取票】立即从已连接邮箱增量同步新发票。默认当前账号；多账号时可指定 accountId。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "description": "邮箱账号 id（省略=按后端默认，通常全部/单账号）"
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "回溯起始日期 YYYY-MM-DD（省略=增量高水位）"
+          }
+        }
+      }
+    },
+    {
+      "name": "rebu_get_inbox",
+      "description": "【取票】查看收件箱 triage 概览：待确认数、待分配数与 pending 发票列表。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_list_invoices",
+      "description": "【检索】按状态/关联/类别/日期检索发票（分页）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "发票状态过滤，如 need_confirm/classified"
+          },
+          "linked": {
+            "type": "string",
+            "description": "关联过滤：'true' 已分配 / 'false' 未分配"
+          },
+          "category": {
+            "type": "string",
+            "description": "费用类别过滤"
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "开始日期 YYYY-MM-DD"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "结束日期 YYYY-MM-DD"
+          },
+          "page": {
+            "type": "integer",
+            "description": "页码，默认 1"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页条数"
+          }
+        }
+      }
+    },
+    {
+      "name": "rebu_get_invoice",
+      "description": "【检索】查看单张发票明细（字段、抽取来源、状态、附件）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_update_invoice_fields",
+      "description": "【确认归类】修正抽取字段。fields 可含 amount/total_amount/invoice_date/seller_name/city/transport_from/transport_to/transport_type/trip_date/expense_category 等。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          },
+          "fields": {
+            "type": "object",
+            "description": "要更新的字段键值对"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "fields"
+        ]
+      }
+    },
+    {
+      "name": "rebu_confirm_invoice",
+      "description": "【确认归类】提交用户核验结论：确认该发票并推进到 classified 状态。verified=false 可撤销核验。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "是否确认核验，默认 true；false=撤销核验"
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_list_needs_attention",
+      "description": "【待办聚合】一次性返回\"需要用户确认/校验\"的全景：收件箱概览（新收/待确认计数+pending）+ 未核验发票清单。Agent 用它向用户汇报\"有哪些等你拍板\"。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_list_unverified_invoices",
+      "description": "【待校验】列出尚未经用户核验（user_verified=0）的发票——即需要用户逐一确认字段/归类的队列。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "rebu_list_pending_confirmations",
+      "description": "【待确认】列出状态机判定为 need_confirm 的发票（抽取存疑/缺字段/疑似重复等，需用户确定）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "页码"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页条数"
+          }
+        }
+      }
+    },
+    {
+      "name": "rebu_create_reimbursement",
+      "description": "【建单】新建报销单。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordName": {
+            "type": "string",
+            "description": "报销单名称"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注（可选）"
+          }
+        },
+        "required": [
+          "recordName"
+        ]
+      }
+    },
+    {
+      "name": "rebu_list_reimbursements",
+      "description": "【建单】列出报销单。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "状态过滤（可选）"
+          }
+        }
+      }
+    },
+    {
+      "name": "rebu_get_reimbursement",
+      "description": "【建单】报销单详情（含待确认任务与政策校验投影）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "rebu_link_invoices",
+      "description": "【分配】把发票分配到指定报销单。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          },
+          "invoiceIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "发票 id 列表"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceIds"
+        ]
+      }
+    },
+    {
+      "name": "rebu_unlink_invoice",
+      "description": "【分配】从报销单移除一张发票（不删除发票）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          },
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_list_review_tasks",
+      "description": "【校验】列出报销单的待确认/复核任务。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态：open/resolved/dismissed"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "rebu_resolve_review_task",
+      "description": "【校验】处理一条复核任务；confirmClassify=true 可同时确认归类。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "integer",
+            "description": "任务 id"
+          },
+          "resolution": {
+            "type": "string",
+            "description": "处理说明（可选）"
+          },
+          "confirmClassify": {
+            "type": "boolean",
+            "description": "处理后是否确认归类"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_list_policy_checks",
+      "description": "【校验】列出报销单的政策校验项（超标/超期等，仅提示不阻断）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态过滤（可选）"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "rebu_acknowledge_policy_check",
+      "description": "【校验】确认/豁免一条政策校验项（记录操作人与原因）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkId": {
+            "type": "integer",
+            "description": "校验项 id"
+          },
+          "note": {
+            "type": "string",
+            "description": "确认/豁免原因"
+          }
+        },
+        "required": [
+          "checkId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_export_reimbursement_excel",
+      "description": "【导出】导出公司 Excel 报销模板。返回保存到本机的文件路径（savedTo/filename/bytes）——.xlsx 是二进制，不通过文本通道传输；把 savedTo 路径告知用户即可。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "报销单 id"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "rebu_delete_invoice",
+      "description": "【回收站】软删发票（移入回收站，可恢复）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_restore_invoice",
+      "description": "【回收站】从回收站恢复发票。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "description": "发票 id"
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "rebu_list_deleted_invoices",
+      "description": "【回收站】列出回收站中的已删发票。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "页码"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页条数"
+          }
+        }
+      }
+    }
+  ]
+}

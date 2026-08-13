@@ -1,0 +1,48 @@
+{
+  "employee": {
+    "name": "张三",
+    "employeeId": "K12345",
+    "department": "IT Solutions",
+    "position": "Software Engineer",
+    "costCenter": "CC100",
+    "level": "staff"
+  },
+  "trip": {
+    "startDate": "2026-08-01",
+    "endDate": "2026-08-05",
+    "destination": "上海",
+    "purpose": "客户拜访"
+  },
+  "invoices": [
+    {
+      "id": "inv_1",
+      "rawText": "增值税电子普通发票\n发票号码：23442000000012345678\n开票日期：2026年08月02日\n销售方名称：上海如家酒店管理有限公司\n价税合计：¥450.00\n税额：¥25.47",
+      "emailSubject": "如家酒店电子发票",
+      "fileName": "hotel_invoice_0802.pdf"
+    },
+    {
+      "id": "inv_2",
+      "rawText": "火车票\n从 苏州 到 上海虹桥\n二等座\n2026年08月01日\n¥39.50",
+      "emailSubject": "12306电子客票",
+      "fileName": "railway_ticket_0801.pdf"
+    },
+    {
+      "id": "inv_3",
+      "rawText": "滴滴出行电子发票\n金额：¥65.00\n2026年08月03日\n从 浦东新区陆家嘴 到 上海虹桥火车站",
+      "emailSubject": "滴滴出行发票",
+      "fileName": "didi_receipt.pdf"
+    },
+    {
+      "id": "inv_4",
+      "emailSubject": "餐饮发票",
+      "rawText": "增值税普通发票\n发票号码：31001900000087654321\n销售方名称：上海外婆家餐饮管理有限公司\n价税合计：¥128.00\n开票日期：2026年08月02日",
+      "fileName": "meal_invoice.pdf"
+    },
+    {
+      "id": "inv_5",
+      "rawText": "一些模糊的文本没有关键信息",
+      "emailSubject": "转发的邮件",
+      "fileName": "unknown.pdf"
+    }
+  ]
+}

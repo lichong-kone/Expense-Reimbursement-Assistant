@@ -1,0 +1,276 @@
+{
+  "$schema": "https://workbuddy.dev/schemas/skill-manifest/v1.json",
+  "name": "rebu-expense-agent",
+  "version": "1.1.0",
+  "type": "service",
+  "title": "REBU 报销助手",
+  "description": "Drive the KONE/通力 expense-reimbursement system through the REBU MCP server. Orchestrates auth → setup → collect → confirm → assemble → check → export → recycle with human-in-the-loop discipline.",
+  "author": "REBU Team",
+  "license": "ISC",
+  "homepage": "https://github.com/lichong-kone/rebu",
+
+  "runtime": {
+    "transport": "mcp-stdio",
+    "command": "node",
+    "args": ["dist/mcp/rebu-mcp-server.js"],
+    "protocol_version": "2024-11-05"
+  },
+
+  "routing": {
+    "mode": "service",
+    "requires_mcp": true,
+    "fallback_skill": "kone-expense-reimbursement",
+    "disambiguation_prompt": "连接 REBU 完整处理，还是离线分析本地资料？",
+    "service_conditions": [
+      "MCP available (rebu_* tools detected)",
+      "User needs: mailbox sync, persistent records, controlled templates, or formal Excel export"
+    ],
+    "portable_conditions": [
+      "User explicitly requests offline",
+      "REBU service unreachable",
+      "User only processing local extracted text/structured data"
+    ]
+  },
+
+  "env": {
+    "REBU_API_BASE": {
+      "required": true,
+      "description": "REBU API server base URL (e.g. https://rebu.example.com or http://127.0.0.1:3001)",
+      "sensitive": false
+    },
+    "REBU_MCP_TOKEN": {
+      "required": false,
+      "description": "Pre-minted Bearer JWT for static auth (provide via Secret Store or env, never in chat)",
+      "sensitive": true,
+      "credential_handoff": "secret_store_or_env"
+    },
+    "REBU_USERNAME": {
+      "required": false,
+      "description": "Auto-login username (provide via Secret Store or env, never in chat)",
+      "sensitive": true,
+      "credential_handoff": "secret_store_or_env"
+    },
+    "REBU_PASSWORD": {
+      "required": false,
+      "description": "Auto-login password (provide via Secret Store or env, never in chat)",
+      "sensitive": true,
+      "credential_handoff": "secret_store_or_env"
+    },
+    "REBU_MCP_STATE": {
+      "required": false,
+      "description": "Path to local credential cache file (default: ~/.rebu-mcp/state.json)",
+      "sensitive": false
+    }
+  },
+
+  "sensitive_fields": [
+    "REBU_MCP_TOKEN",
+    "REBU_USERNAME",
+    "REBU_PASSWORD",
+    "password",
+    "authCode",
+    "imapPassword"
+  ],
+
+  "capabilities": {
+    "tools": "tools.json",
+    "resources": true,
+    "prompts": true
+  },
+
+  "auto_processing": {
+    "require_scope_preview": true,
+    "require_reversibility_disclosure": true,
+    "summary_format": "three_part",
+    "summary_sections": ["已自动处理", "仍需决定", "下一步"]
+  },
+
+  "review_actions": [
+    {
+      "id": "keep",
+      "label": "保留原值",
+      "description": "Accept current extraction/classification as-is"
+    },
+    {
+      "id": "adjust",
+      "label": "调整信息或金额",
+      "description": "Correct fields then confirm; must supply field patch"
+    },
+    {
+      "id": "exempt",
+      "label": "申请豁免并说明原因",
+      "description": "Acknowledge policy breach with justification; reason required",
+      "requires": ["reason"]
+    },
+    {
+      "id": "provide_info",
+      "label": "补充信息",
+      "description": "Supply missing fields (date, route, attendees, etc.)",
+      "requires": ["fields"]
+    },
+    {
+      "id": "defer",
+      "label": "稍后处理",
+      "description": "Skip this item; no action taken, persists for next session"
+    }
+  ],
+
+  "output_contract": {
+    "$comment": "Shared OutputManifest contract per §6.8.2 item 3 — both service and portable skills produce equivalent structured outputs",
+    "contract_ref": "docs/spec/REBU_SYSTEM_SPEC.md#6.8.2",
+    "schema": {
+      "type": "object",
+      "required": ["CanonicalInvoiceFields", "PolicyFindings", "ReviewQuestions", "ReimbursementDraft", "OutputManifest"],
+      "properties": {
+        "CanonicalInvoiceFields": {
+          "type": "array",
+          "description": "Canonical invoice fields with source/confidence per field; shared field set between service and portable skills",
+          "items": {
+            "type": "object",
+            "required": ["invoice_code", "invoice_number", "amount", "invoice_date", "status"],
+            "properties": {
+              "invoice_code": { "type": "string" },
+              "invoice_number": { "type": "string" },
+              "amount": { "type": "number" },
+              "total_amount": { "type": "number" },
+              "invoice_date": { "type": "string", "format": "date" },
+              "seller_name": { "type": "string" },
+              "city": { "type": "string", "description": "Normalized to tier-1 city name" },
+              "expense_category": { "type": "string" },
+              "status": { "type": "string", "enum": ["parsed", "need_confirm", "classified"] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "field_sources": { "type": "object", "description": "Per-field provenance: ocr/email/user/inferred" }
+            }
+          }
+        },
+        "PolicyFindings": {
+          "type": "array",
+          "description": "Policy check results: over-limit, over-time, missing docs, etc.",
+          "items": {
+            "type": "object",
+            "required": ["rule_id", "check_type", "level"],
+            "properties": {
+              "rule_id": { "type": "string" },
+              "check_type": { "type": "string" },
+              "actual_value": {},
+              "allowed_value": {},
+              "exceed_value": {},
+              "level": { "type": "string", "enum": ["info", "warn"] },
+              "status": { "type": "string", "enum": ["open", "acknowledged", "overridden"] },
+              "reason": { "type": "string" },
+              "operator": { "type": "string" }
+            }
+          }
+        },
+        "ReviewQuestions": {
+          "type": "array",
+          "description": "Items requiring explicit user confirmation before proceeding",
+          "items": {
+            "type": "object",
+            "required": ["id", "type", "description"],
+            "properties": {
+              "id": { "type": "integer" },
+              "type": { "type": "string", "enum": ["confirm_attribution", "supplement_info", "duplicate", "standard_prompt", "ocr_failed"] },
+              "description": { "type": "string" },
+              "status": { "type": "string", "enum": ["open", "resolved", "dismissed"] },
+              "suggestions": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "ReimbursementDraft": {
+          "type": "object",
+          "description": "Structured reimbursement draft with line items, totals, and budget summary",
+          "required": ["recordName", "items", "totalAmount"],
+          "properties": {
+            "recordName": { "type": "string" },
+            "items": { "type": "array" },
+            "totalAmount": { "type": "number" },
+            "reimbursableAmount": { "type": "number" },
+            "budgetSummary": { "type": "object" }
+          }
+        },
+        "OutputManifest": {
+          "type": "object",
+          "description": "Provenance and versioning metadata for the output bundle",
+          "required": ["policyPackVersion", "generatedAt"],
+          "properties": {
+            "policyPackVersion": { "type": "string", "description": "Version of the policy rule pack used" },
+            "templatePackVersion": { "type": "string", "description": "Version of the Excel template pack (if applicable)" },
+            "generatedAt": { "type": "string", "format": "date-time" },
+            "fileHashes": {
+              "type": "object",
+              "description": "SHA-256 hashes of generated output files",
+              "additionalProperties": { "type": "string" }
+            },
+            "skillVersion": { "type": "string" },
+            "serverVersion": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "confirm_gates": [
+    {
+      "id": "need_confirm",
+      "description": "Invoices with low-confidence extraction, missing fields, or suspected duplicates require explicit user confirmation before proceeding.",
+      "trigger": "invoice status == need_confirm OR confidence < threshold",
+      "action": "Present details and recommendations; wait for user decision using normalized actions (keep/adjust/provide_info/defer)"
+    },
+    {
+      "id": "policy_acknowledge",
+      "description": "Policy checks (over-limit, over-time, missing supporting docs) must be shown to the user. User decides to keep (cap to standard), exempt with reason, or adjust.",
+      "trigger": "policy_checks with level=warn found for reimbursement",
+      "action": "List policy findings with impact; require keep/exempt(+reason)/adjust"
+    },
+    {
+      "id": "delete_invoice",
+      "description": "Invoice deletion (soft-delete to recycle bin). Reversible but must be disclosed before execution.",
+      "trigger": "rebu_delete_invoice called",
+      "action": "Confirm with user which invoice(s) to delete; state: soft-delete, recoverable via rebu_restore_invoice"
+    },
+    {
+      "id": "send_email",
+      "description": "Any outbound email action requires explicit user approval.",
+      "trigger": "Action would trigger SMTP send",
+      "action": "Show recipient, subject, content summary; wait for explicit go-ahead"
+    }
+  ],
+
+  "dependencies": {
+    "external": [
+      {
+        "name": "REBU API Server",
+        "description": "The REBU backend providing auth, invoice processing, policy engine, template generation, and mailbox sync",
+        "url_env": "REBU_API_BASE",
+        "required": true
+      }
+    ],
+    "companion_skills": [
+      {
+        "name": "kone-expense-reimbursement",
+        "description": "Domain knowledge skill with policy rules, field mappings, and extraction logic. Provides background context but is not required for runtime operation.",
+        "required": false
+      }
+    ]
+  },
+
+  "triggers": [
+    "报销",
+    "整理发票",
+    "生成报销单",
+    "报销申请",
+    "收发票",
+    "核对发票",
+    "连接邮箱收发票",
+    "expense reimbursement",
+    "collect invoices"
+  ],
+
+  "prompts": [
+    "prompts/setup-onboarding.md",
+    "prompts/triage-inbox.md",
+    "prompts/build-reimbursement.md",
+    "prompts/verify-pending.md"
+  ]
+}

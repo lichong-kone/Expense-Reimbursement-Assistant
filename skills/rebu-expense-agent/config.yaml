@@ -1,0 +1,112 @@
+# WorkBuddy Skill Configuration — rebu-expense-agent
+# Type: service (requires REBU API backend)
+# Transport: MCP over stdio
+
+name: rebu-expense-agent
+version: 1.1.0
+type: service
+
+display:
+  title: REBU 报销助手
+  icon: receipt
+  description: |
+    Orchestrate expense reimbursement via the REBU MCP server.
+    Handles auth, mailbox sync, invoice triage, reimbursement assembly,
+    policy checks, and Excel export with human-in-the-loop confirmation.
+
+runtime:
+  transport: mcp-stdio
+  command: node
+  args:
+    - dist/mcp/rebu-mcp-server.js
+  protocol_version: "2024-11-05"
+  timeout_seconds: 30
+
+# Mode routing: service vs portable (§6.8.3 item 1)
+# This skill activates when REBU MCP is available AND user needs:
+#   mailbox sync, persistent records, controlled templates, or formal Excel export.
+# If MCP unavailable or user explicitly requests offline → route to portable skill instead.
+# When ambiguous, ask once: "连接 REBU 完整处理，还是离线分析本地资料？"
+routing:
+  mode: service
+  requires_mcp: true
+  fallback_skill: kone-expense-reimbursement
+  disambiguation_prompt: "连接 REBU 完整处理，还是离线分析本地资料？"
+
+# Environment variables — sensitive values MUST be provided via Secret Store or env,
+# NEVER solicited or echoed in normal Agent chat messages.
+env:
+  REBU_API_BASE:
+    required: true
+    description: REBU API server base URL
+    example: https://rebu.example.com
+    sensitive: false
+  REBU_MCP_TOKEN:
+    required: false
+    sensitive: true
+    description: Pre-minted Bearer JWT for static auth (provide via Secret Store or env)
+    credential_handoff: secret_store_or_env
+  REBU_USERNAME:
+    required: false
+    sensitive: true
+    description: Auto-login username (provide via Secret Store or env, not in chat)
+    credential_handoff: secret_store_or_env
+  REBU_PASSWORD:
+    required: false
+    sensitive: true
+    description: Auto-login password (provide via Secret Store or env, not in chat)
+    credential_handoff: secret_store_or_env
+
+activation:
+  triggers:
+    - 报销
+    - 整理发票
+    - 生成报销单
+    - 报销申请
+    - 收发票
+    - 核对发票
+    - 连接邮箱收发票
+    - expense reimbursement
+    - collect invoices
+  preconditions:
+    - mcp_server_available: rebu
+
+# Confirmation gates — explicit user approval required before these actions
+confirm_gates:
+  - id: need_confirm
+    description: Low-confidence or incomplete invoice requires user decision
+  - id: policy_acknowledge
+    description: Policy warning (over-limit/over-time) requires explicit acknowledgment
+  - id: delete_invoice
+    description: Soft-delete must be disclosed before execution (reversible via restore)
+  - id: send_email
+    description: Outbound email requires explicit user approval
+
+# Auto-processing disclosure — agent MUST preview scope before batch actions
+auto_processing:
+  require_scope_preview: true
+  require_reversibility_disclosure: true
+  summary_format: three_part  # "已自动处理 / 仍需决定 / 下一步"
+
+# Normalized user-facing review actions (§6.8.3 item 5)
+review_actions:
+  - id: keep
+    label: 保留原值
+    description: Accept current extraction/classification result as-is
+  - id: adjust
+    label: 调整信息或金额
+    description: Correct fields then confirm; must supply field patch
+  - id: exempt
+    label: 申请豁免并说明原因
+    description: Acknowledge policy breach with justification; reason required
+  - id: provide_info
+    label: 补充信息
+    description: Supply missing fields (date, route, attendees, etc.)
+  - id: defer
+    label: 稍后处理
+    description: Skip this item for now; no action taken
+
+companion_skills:
+  - name: kone-expense-reimbursement
+    role: domain-knowledge
+    required: false
