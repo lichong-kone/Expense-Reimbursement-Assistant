@@ -67,10 +67,10 @@ hostResponsibilities:
 
 distribution:
   notice: >
-    Public package: policy + organization + review + structured outputs only.
-    The company's official Excel template, physical cell mappings, and template
-    adapter are company-internal and are NOT included in this public package.
-  officialExcelRendering: company-internal
+    Public package: policy + organization + review + structured outputs + official-template
+    Excel rendering. Bundled with one official reimbursement template and the template adapter
+    (requires adm-zip). Internal policy PDFs and backend code are not included.
+  officialExcelRendering: bundled
 
 metadata:
   company: KONE/通力

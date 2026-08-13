@@ -1,0 +1,11 @@
+{
+  "name": "expense-reimbursement-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "报销助手：使用文档 + 可安装 Agent Skill。通用 Skill 的政策核心零依赖；template-adapter 生成正式 Excel 需要 adm-zip。",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "adm-zip": "^0.5.17"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+*-output/
+*-reviewed/
+*-excel/
+*-state.json
+reimbursement.json
+trip.json
+output/

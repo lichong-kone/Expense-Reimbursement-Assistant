@@ -107,7 +107,7 @@ description: >
 
 ## 资源（随 skill 附带）
 - 政策规则快照：`resources/policy-rules.json`（版本化，供本地政策检查使用）。
-- 说明：公司官方 Excel 模板、政策原文 PDF 与物理字段映射属公司内部受控资产，**不随本公开包分发**；正式《费用报销单》Excel 由公司内部适配器渲染。本 Skill 输出 `template-input.json` / `host-contract.json` 等结构化结果，供宿主或内部适配器生成最终文档。
+- 官方模板：`template-adapter/official-template/报销申请_template.xlsx`（随包）。正式《费用报销单》Excel 由 `template-adapter/bundle.mjs` 从该官方模板保真渲染（首次需 `adm-zip`）。政策原文 PDF 与后端代码不随本包。本 Skill 也输出 `template-input.json` / `host-contract.json` 供宿主自定义渲染。
 
 ---
 

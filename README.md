@@ -4,7 +4,7 @@
 
 > ⚠️ **域名可能变更**：下文服务地址（当前 `https://metagentictool.com`）可能调整。**访问不了就回到本仓库根 `README.md` 查看最新地址**——本文件随地址更新。
 >
-> 本仓库只含**使用文档与通用 Skill 的可安装文件**。公司官方报销模板、内部政策原文 PDF、物理单元格映射与后端服务代码属受控资产，**不在本仓库**，由公司内部渠道提供。
+> 本仓库含**使用文档、可安装的 Agent Skill，以及一个公司官方报销 Excel 模板**（用于生成可递交的正式《费用报销单》）。内部政策原文 PDF、后端服务代码不在本仓库。
 
 ## 两类怎么选
 
@@ -96,7 +96,15 @@ Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审�
 
 ## 正式 Excel
 
-本公开包不生成公司官方模板的正式 Excel（官方模板与物理映射为公司内部受控资产，不在本仓库）。它输出 `template-input.json` / `host-contract.json`，供宿主或公司内部适配器生成正式《费用报销单》。
+`reimburse.sh` 在整理与审核完成后，从随包的公司官方模板直接生成**可递交的正式《费用报销单》Excel**（首次会自动安装渲染依赖 `adm-zip`）。正式 Excel 从官方模板副本写入，只改授权单元格，其余公式/样式/合并/勾选框/打印设置逐字节保留；模板 SHA-256 或映射版本不匹配、保真校验失败时拒绝交付。产物含 `bundle-summary.md`（是否可递交）与 `bundle-manifest.json`（版本与 hash）。
+
+也可手动渲染：
+
+```bash
+node skills/kone-expense-reimbursement/template-adapter/install-or-verify.mjs   # 校验完整性
+node skills/kone-expense-reimbursement/template-adapter/bundle.mjs \
+  --template-input <name>-output/template-input.json --output-dir <name>-excel
+```
 
 详见 [通用 Skill 说明](skills/kone-expense-reimbursement/README.md)。
 
@@ -110,5 +118,5 @@ Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审�
 
 ## 说明
 
-- 本仓库只提供使用文档与通用 Skill 可安装文件；不含官方模板、政策原文 PDF、物理映射或后端代码。
+- 本仓库提供使用文档、可安装 Skill 与一个公司官方报销 Excel 模板；不含内部政策原文 PDF 或后端代码。
 - 文中服务地址可能随部署调整；本 `README.md` 为最新地址与用法的权威入口。
