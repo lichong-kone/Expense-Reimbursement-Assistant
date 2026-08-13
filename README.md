@@ -69,32 +69,32 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 # 类别二 · 通用 Skill
 
-平台中立、**不依赖任何服务器**、只需 Node 18+。任何支持 Skill 的 Agent 装上后，用自身能力（读邮件、解析附件、OCR）配合本 Skill 的**公司政策 + 整理 + 审核**逻辑，完成报销整理与结构化输出。
+平台中立、不依赖服务器、只需 Node 18+。Agent 装上后，用自身能力（读邮件、解析附件、OCR）配合本 Skill 的公司政策与审核逻辑，完成报销整理与结构化输出。
 
-> **什么是 Skill**：一个带 YAML frontmatter（`name`、`description`）的 `SKILL.md` 加同目录逻辑/资源文件。安装就是把该目录放到宿主读取 skills 的位置（Kiro `~/.kiro/skills/`；部分宿主 `~/.agents/skills/`；或宿主的导入界面）。
+> **Skill**：一个带 YAML frontmatter（`name`、`description`）的 `SKILL.md` 加同目录资源。安装即把该目录放到宿主的 skills 位置（Kiro `~/.kiro/skills/`；部分宿主 `~/.agents/skills/`；或宿主导入界面）。
 
-## 一条命令走完全流程
+## 用法
 
-只需克隆一次，然后**反复运行同一条命令**——脚本会自动判断当前该做哪一步（建骨架 → 处理 → 应用决定）：
+克隆一次，然后反复运行同一条命令，脚本自动推进：
 
 ```bash
 git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
 
-bash reimburse.sh 我的报销.json
+bash reimburse.sh reimbursement.json
 ```
 
-- **第 1 次**：文件不存在 → 生成可编辑骨架 `我的报销.json`，填入员工/行程/已提取发票文本。
-- **第 2 次**（再次运行同一命令）：校验并生成审核包 `我的报销-output/`（`summary.md`、超标问题、决定模板等）。若有超标/待确认项，编辑 `我的报销-output/review-decisions.template.json` 的每项 `action`（`keep`/`adjust`/`exempt`+原因/`provide_info`/`defer`）。
-- **第 3 次**（再次运行同一命令）：检测到决定已填 → 自动应用，产出最终结果 `我的报销-reviewed/`（含实际/可报销总额、已应用决定）。
+- 第 1 次：生成骨架 `reimbursement.json`，填入员工、行程、已提取的发票文本。
+- 第 2 次：生成审核包 `reimbursement-output/`；如有超标项，在其中 `review-decisions.template.json` 填写每项 `action`（`keep`/`adjust`/`exempt`+原因/`provide_info`/`defer`）。
+- 第 3 次：检测到决定已填，自动应用，产出 `reimbursement-reviewed/`（含实际/可报销总额、已应用决定）。
 
-需要 Node.js ≥ 18；零外部依赖；全程离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
+Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
 
-> **要把 Skill 注册进你的 Agent 宿主**（让宿主自动发现并编排），再运行一次：`bash install.sh`（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或用 `--dest` 指定）。这一步是可选的，不影响上面的命令行使用。
+> 可选：`bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定），让宿主自动发现编排。
 
-## 关于正式 Excel
+## 正式 Excel
 
-本公开包**不生成公司官方模板的正式 Excel**（官方模板与物理映射属公司内部受控资产，不在本仓库）。它输出 `template-input.json` / `host-contract.json` 等结构化结果，供宿主渲染或由公司内部适配器生成正式《费用报销单》。
+本公开包不生成公司官方模板的正式 Excel（官方模板与物理映射为公司内部受控资产，不在本仓库）。它输出 `template-input.json` / `host-contract.json`，供宿主或公司内部适配器生成正式《费用报销单》。
 
 详见 [通用 Skill 说明](skills/kone-expense-reimbursement/README.md)。
 

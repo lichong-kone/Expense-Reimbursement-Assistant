@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
 #
-# 报销一条命令入口（通用 Skill）
+# 报销一条命令入口（通用 Skill）。始终运行同一条命令，脚本自动推进：
 #
-# 用法：始终运行同一条命令，脚本会自动判断当前该做哪一步：
+#   bash reimburse.sh reimbursement.json
 #
-#   bash reimburse.sh <我的报销.json>
+#   第 1 次：生成可编辑骨架，填入员工/行程/已提取发票文本。
+#   第 2 次：校验并生成审核包；如有超标项，填写 <name>-output/review-decisions.template.json。
+#   第 3 次：检测到决定已填，自动应用，产出 <name>-reviewed/。
 #
-#   第 1 次运行：文件不存在 → 生成可编辑骨架，请填入员工/行程/已提取发票文本。
-#   第 2 次运行：文件已填好 → 校验并生成审核包（summary.md、超标问题、决定模板…）。
-#                若有超标/待确认项，去 <...>-output/review-decisions.template.json 填写决定。
-#   第 3 次运行：决定模板已填 → 自动应用决定，产出最终审核结果。
-#
-# 无需记忆 --init / --validate / --decisions；同一条命令按提示重复运行即可。
-# 需要 Node.js >= 18；零外部依赖；不联网。
+# 需要 Node.js >= 18；零依赖；离线。
 #
 set -euo pipefail
 
@@ -21,8 +17,8 @@ CORE="$SCRIPT_DIR/skills/kone-expense-reimbursement/portable-core.mjs"
 
 INPUT="${1:-}"
 if [ -z "$INPUT" ]; then
-  echo "用法: bash reimburse.sh <我的报销.json>"
-  echo "（第一次运行会在该路径生成可编辑骨架）"
+  echo "用法: bash reimburse.sh reimbursement.json"
+  echo "（首次运行会在该路径生成可编辑骨架）"
   exit 1
 fi
 
