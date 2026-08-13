@@ -644,6 +644,20 @@ function detectSuspectedDuplicates(results) {
   return duplicates;
 }
 
+/**
+ * Compute a stable cross-run dedup key from canonical fields.
+ * Uses invoiceNumber|amount|invoiceDate; returns null when fewer than 2 of the
+ * 3 identifying fields are present (not reliable enough to persist/skip).
+ */
+function computeDedupKey(fields) {
+  const num = fields.invoiceNumber || '';
+  const amt = fields.totalAmount ?? fields.amount ?? '';
+  const date = fields.invoiceDate || '';
+  const presentCount = [num, amt, date].filter((v) => v !== '' && v !== null && v !== undefined).length;
+  if (presentCount < 2) return null;
+  return `${num}|${amt}|${date}`;
+}
+
 // ─── Structured Review Questions ─────────────────────────────────────
 
 /**
@@ -1186,7 +1200,7 @@ function generateAuditEntries(input, results, policyChecks) {
 /**
  * Generate a human-readable summary.md from the processing results.
  */
-function generateSummaryMd(input, draft, report, policyFindings, reviewQuestions, duplicates, decisionsApplied, recovery = {}, aggregation = null) {
+function generateSummaryMd(input, draft, report, policyFindings, reviewQuestions, duplicates, decisionsApplied, recovery = {}, aggregation = null, incremental = null) {
   const lines = [];
   lines.push('# Reimbursement Processing Summary\n');
   lines.push(`**Employee**: ${input.employee.name} (${input.employee.employeeId || 'N/A'})`);
@@ -1262,6 +1276,14 @@ function generateSummaryMd(input, draft, report, policyFindings, reviewQuestions
     lines.push('');
   }
 
+  // Incremental (only when --state used)
+  if (incremental && incremental.stateEnabled) {
+    lines.push('## Incremental (cross-run dedup)\n');
+    lines.push(`- Skipped as already-processed: ${incremental.skipped.length}`);
+    lines.push(`- Processed keys total (in state): ${incremental.processedKeysOut.length}`);
+    lines.push('');
+  }
+
   lines.push('## Recovery\n');
   lines.push(`- Input file: \`${recovery.inputFile || 'input.json'}\``);
   lines.push(`- Decisions file: ${recovery.decisionsFile ? `\`${recovery.decisionsFile}\`` : '`none` (copy `review-decisions.template.json` when ready)'}`);
@@ -1307,7 +1329,7 @@ export async function processInput(input, options = {}) {
   const decisions = options.decisions || null;
 
   // 1. Extract fields for each invoice
-  const results = input.invoices.map((inv, idx) => {
+  let results = input.invoices.map((inv, idx) => {
     const id = inv.id || `inv_${idx + 1}`;
     const { fields, layers } = extractFields(inv);
 
@@ -1327,6 +1349,23 @@ export async function processInput(input, options = {}) {
 
     return { id, status, fields, missingFields: missing, confidence, extractionLayers: layers };
   });
+
+  // 1b. Cross-run incremental dedup (optional --state): skip invoices whose
+  // stable business key was already processed in a previous run.
+  const processedKeys = new Set(Array.isArray(options.processedKeys) ? options.processedKeys : []);
+  const incrementalSkipped = [];
+  if (processedKeys.size > 0) {
+    const kept = [];
+    for (const item of results) {
+      const key = computeDedupKey(item.fields);
+      if (key && processedKeys.has(key)) {
+        incrementalSkipped.push({ id: item.id, key });
+      } else {
+        kept.push(item);
+      }
+    }
+    results = kept;
+  }
 
   // 2. Duplicate detection — mark suspected duplicates as need_confirm
   const duplicates = detectSuspectedDuplicates(results);
@@ -1398,6 +1437,21 @@ export async function processInput(input, options = {}) {
   }
 
   // 8. Generate outputs
+  // Cross-run incremental bookkeeping: keys of the invoices actually processed
+  // this run, merged with any previously processed keys for the state file.
+  const newKeys = [];
+  for (const r of results) {
+    const k = computeDedupKey(r.fields);
+    if (k) newKeys.push(k);
+  }
+  const processedKeysOut = Array.from(new Set([...processedKeys, ...newKeys]));
+  const incremental = {
+    stateEnabled: processedKeys.size > 0 || Array.isArray(options.processedKeys),
+    skipped: incrementalSkipped,
+    newKeys,
+    processedKeysOut,
+  };
+
   const draft = generateReimbursementDraft(input.employee, input.trip, results, aggregation);
   const report = generatePolicyReport(input.employee, allChecks);
   const templateInput = generateTemplateInput(input.employee, results, aggregation, input.trip);
@@ -1405,7 +1459,7 @@ export async function processInput(input, options = {}) {
   const reviewMd = generateReviewQuestions(results, allChecks, duplicates);
   const auditEntries = generateAuditEntries(input, results, allChecks);
   const decisionTemplate = generateDecisionTemplate(reviewQuestions);
-  const summaryMd = generateSummaryMd(input, draft, report, policyFindings, reviewQuestions, duplicates, decisions, options.recovery, aggregation);
+  const summaryMd = generateSummaryMd(input, draft, report, policyFindings, reviewQuestions, duplicates, decisions, options.recovery, aggregation, incremental);
 
   return {
     draft,
@@ -1423,6 +1477,7 @@ export async function processInput(input, options = {}) {
     decisionTemplate,
     summaryMd,
     aggregation,
+    incremental,
   };
 }
 
@@ -1523,7 +1578,7 @@ KONE Expense Reimbursement — Portable Core CLI (§6.8.3)
 Usage:
   node portable-core.mjs --init <path>
   node portable-core.mjs --validate --input <input.json>
-  node portable-core.mjs --input <input.json> [--output-dir <dir>] [--decisions <decisions.json>]
+  node portable-core.mjs --input <input.json> [--output-dir <dir>] [--decisions <decisions.json>] [--state <state.json>]
 
 Commands:
   --init <path>        Generate a sample input JSON template at <path>
@@ -1533,6 +1588,10 @@ Options:
   --input, -i          Path to input JSON (PortableSkillInput schema)
   --output-dir, -o     Output directory (default: ./output)
   --decisions, -d      Path to decisions JSON (answers to review questions)
+  --state, -s          Path to a JSON state file for cross-run incremental dedup.
+                       Invoices whose stable key (invoiceNumber|amount|date) was
+                       processed in a prior run are skipped; the file is updated
+                       after each run. Zero-dependency, offline. Optional.
   --help, -h           Show this help
 
 Decision JSON schema:
@@ -1586,6 +1645,7 @@ PDF/OFD/XML parsing and controlled Excel rendering.
   let inputPath = null;
   let outputDir = './output';
   let decisionsPath = null;
+  let statePath = null;
   let validateOnly = args.includes('--validate');
 
   for (let i = 0; i < args.length; i++) {
@@ -1595,6 +1655,8 @@ PDF/OFD/XML parsing and controlled Excel rendering.
       outputDir = args[++i];
     } else if ((args[i] === '--decisions' || args[i] === '-d') && args[i + 1]) {
       decisionsPath = args[++i];
+    } else if ((args[i] === '--state' || args[i] === '-s') && args[i + 1]) {
+      statePath = args[++i];
     }
   }
 
@@ -1621,6 +1683,23 @@ PDF/OFD/XML parsing and controlled Excel rendering.
     decisions = JSON.parse(decisionsRaw);
   }
 
+  // Read prior state (optional --state): cross-run incremental dedup.
+  let processedKeysIn = [];
+  let stateExisted = false;
+  if (statePath) {
+    try {
+      const stateRaw = await readFile(resolve(statePath), 'utf-8');
+      const state = JSON.parse(stateRaw);
+      if (Array.isArray(state.processedKeys)) {
+        processedKeysIn = state.processedKeys;
+        stateExisted = true;
+      }
+    } catch {
+      // No prior state file yet — first run; start with an empty key set.
+      processedKeysIn = [];
+    }
+  }
+
   // Process with safe relative references for durable recovery guidance.
   const relativeFileRef = (candidate) => (
     candidate && candidate.startsWith('/') ? candidate.split('/').pop() : candidate
@@ -1630,12 +1709,16 @@ PDF/OFD/XML parsing and controlled Excel rendering.
     decisionsFile: relativeFileRef(decisionsPath),
     outputDirectory: relativeFileRef(outputDir) || 'output',
   };
-  const result = await processInput(input, { decisions, recovery });
+  const result = await processInput(input, {
+    decisions,
+    recovery,
+    processedKeys: statePath ? processedKeysIn : undefined,
+  });
 
   const {
     draft, report, templateInput, hostContract, reviewMd, auditEntries,
     policyFindings, reviewQuestions, duplicates, policyPackVersion,
-    decisionValidation, decisionAuditEntries, decisionTemplate, summaryMd,
+    decisionValidation, decisionAuditEntries, decisionTemplate, summaryMd, incremental,
   } = result;
 
   // If decisions were invalid, report and exit
@@ -1730,6 +1813,17 @@ PDF/OFD/XML parsing and controlled Excel rendering.
   const manifestJson = JSON.stringify(manifest, null, 2);
   await writeFile(join(outDir, 'manifest.json'), manifestJson);
 
+  // Persist state (optional --state): write merged processed keys for next run.
+  if (statePath && incremental) {
+    const stateOut = {
+      version: '1.0.0',
+      processedKeys: incremental.processedKeysOut,
+      updatedAt: new Date().toISOString(),
+    };
+    await mkdir(dirname(resolve(statePath)), { recursive: true });
+    await writeFile(resolve(statePath), JSON.stringify(stateOut, null, 2));
+  }
+
   // Terminal output: clear, actionable
   console.log('');
   console.log(`✓ Output written to ${outDir}/`);
@@ -1764,6 +1858,10 @@ PDF/OFD/XML parsing and controlled Excel rendering.
     }
   }
   console.log('');
+  if (statePath && incremental && incremental.stateEnabled) {
+    console.log(`  ↻ Incremental: skipped ${incremental.skipped.length} already-processed; state now holds ${incremental.processedKeysOut.length} key(s) → ${relativeFileRef(statePath)}`);
+    console.log('');
+  }
   console.log('  NOTE: Host owns PDF/OFD/XML parsing and controlled Excel rendering.');
   console.log('');
 }

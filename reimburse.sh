@@ -37,6 +37,7 @@ base="${INPUT%.json}"
 OUT_DIR="${base}-output"
 REVIEWED_DIR="${base}-reviewed"
 TEMPLATE="$OUT_DIR/review-decisions.template.json"
+STATE="${base}-state.json"   # 跨运行增量去重状态（自动维护）
 
 # 步骤 1：输入不存在 → 生成骨架
 if [ ! -f "$INPUT" ]; then
@@ -57,7 +58,7 @@ fi
 
 # 步骤 3：决定已填 → 应用决定
 if [ "$decisions_ready" = true ]; then
-  node "$CORE" --input "$INPUT" --decisions "$TEMPLATE" --output-dir "$REVIEWED_DIR"
+  node "$CORE" --input "$INPUT" --decisions "$TEMPLATE" --output-dir "$REVIEWED_DIR" --state "$STATE"
   echo ""
   echo "✓ 已应用你的审核决定，最终结果在：$REVIEWED_DIR/"
   echo "  查看 $REVIEWED_DIR/summary.md（含实际/可报销总额、已应用决定、下一步）。"
@@ -65,9 +66,9 @@ if [ "$decisions_ready" = true ]; then
   exit 0
 fi
 
-# 步骤 2：校验 + 处理，生成审核包
+# 步骤 2：校验 + 处理，生成审核包（--state 自动跨运行增量去重）
 node "$CORE" --validate --input "$INPUT"
-node "$CORE" --input "$INPUT" --output-dir "$OUT_DIR"
+node "$CORE" --input "$INPUT" --output-dir "$OUT_DIR" --state "$STATE"
 echo ""
 echo "✓ 审核包已生成：$OUT_DIR/"
 echo "  阅读 $OUT_DIR/summary.md 查看总额与政策提示。"

@@ -32,7 +32,7 @@
   "cli": {
     "init": "--init <path>",
     "validate": "--validate --input <path>",
-    "run": "--input <path> [--output-dir <dir>] [--decisions <path>]"
+    "run": "--input <path> [--output-dir <dir>] [--decisions <path>] [--state <path>]"
   },
   "inputs": [
     {

@@ -90,6 +90,8 @@ bash reimburse.sh reimbursement.json
 
 Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
 
+> **增量**：`reimburse.sh` 自动维护一个状态文件（`<name>-state.json`），重复运行只处理新发票、跳过已处理的（按发票号+金额+日期去重）。连邮箱、只取新邮件的增量拉取由 Agent 环境负责；本状态文件保证“已处理不重复”。零依赖、离线。
+
 > 可选：`bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定），让宿主自动发现编排。
 
 ## 正式 Excel
