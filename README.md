@@ -73,7 +73,7 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 ## 怎么用
 
-**第 1 步 · 安装**：把这个 Skill 装进你的 Agent（Kiro、WorkBuddy、Claude 等），重启/刷新一下即可。
+**第 1 步 · 安装**：用你 Agent 的“导入 / 添加 Skill”功能装上，或把 Skill 文件夹放进宿主的 skills 目录，然后重启 / 刷新。**Windows、macOS、Linux 都一样**——不用装命令行工具、不用跑脚本。
 
 **第 2 步 · 说需求**：直接对 Agent 说，比如——
 - “帮我整理这个月的报销。”
@@ -92,37 +92,7 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 选“从邮箱收”时，Agent 会**先确认能不能连上你的邮箱**（公司网络有时会拦）。连不上会直接告诉你原因、教你怎么办（比如换个网络，或按公司代理设置再试），不会卡住。你的**邮箱密码/授权码只在本机安全存放**，不会写进文件，也不会出现在对话里。
 
-<details>
-<summary>开发者 / 手动运行（不接 Agent 编排时才需要）</summary>
-
-> 以下都是**在终端直接敲的命令**（`node` / `bash`），**不需要 Agent**——适合开发者、定时任务，或想自己跑的人。它们和上面 Agent 走的是**同一套脚本**：用 Agent 时，是 Agent 在对话里问你问题、再替你执行这些命令。**普通用户可忽略本节。**
-
-安装并（可选）注册到宿主：
-
-```bash
-git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
-cd Expense-Reimbursement-Assistant
-bash install.sh              # 自动探测 ~/.kiro/skills 或 ~/.agents/skills，或用 --dest 指定
-```
-
-**发票文本已提取好**（只要政策整理 + 审核，零依赖、离线）：
-
-```bash
-bash reimburse.sh reimbursement.json
-```
-
-反复运行同一条命令即可推进：首次生成骨架 → 填入员工/行程/发票文本；再次生成审核包（在 `review-decisions.template.json` 填每项决定 `keep/adjust/exempt/provide_info/defer`）；决定填好后自动应用并从随包官方模板生成可递交的正式 Excel。
-
-**让脚本自己收票 + 解析**（本地文件夹或邮箱；用到 `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js`）：
-
-```bash
-node scripts/local-collector/setup.mjs                                        # 引导式配置（密码不入配置）
-node scripts/local-collector/index.mjs --config ./sources.json --precheck     # 邮箱网络预检
-node scripts/local-collector/index.mjs --config ./sources.json --once         # 收票→提取→审核→可选 Excel
-```
-
-数据源 `local`/`mailbox`/`both`；员工信息存 `employee.json` 复用；IMAP 密码只走环境变量（默认 `REBU_IMAP_PASS`）。正式 Excel 从官方模板保真渲染（只改授权单元格，其余逐字节保留，校验不过拒绝交付）。详见 [采集器说明](scripts/local-collector/README.md) 与 [通用 Skill 说明](skills/kone-expense-reimbursement/README.md)。
-</details>
+> 有能力自己跑或想做自动化的开发者：脚本都在 Skill 目录内（`scripts/`、`template-adapter/`），可自行取用；**普通用户无需关心，交给 Agent 即可。**
 
 ---
 
