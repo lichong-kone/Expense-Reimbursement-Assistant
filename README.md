@@ -25,10 +25,10 @@
 ```bash
 git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
-bash install.sh --skill service
+node install.mjs --skill service
 ```
 
-自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装好后重启 Agent。Windows 用 Git Bash 或 WSL 跑同样命令。（报错找不到目录就加 `--dest ~/.kiro/skills`。）
+自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装好后重启 Agent。**Windows / macOS / Linux 同一条命令**（用的是 Node，不是 bash）。
 
 **② 配 MCP：** 打开你 Agent 的配置文件（位置见下），把下面这段粘贴进去，保存后重启：
 
@@ -58,10 +58,10 @@ bash install.sh --skill service
 ```bash
 git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
-bash install.sh
+node install.mjs
 ```
 
-自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装完重启 / 刷新 Agent。Windows 用 Git Bash 或 WSL 跑同样命令。（报错找不到目录就加 `--dest ~/.kiro/skills`。）**不用配 MCP。**
+自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装完重启 / 刷新 Agent。**Windows / macOS / Linux 同一条命令**（用的是 Node，不是 bash）。**不用配 MCP。**
 
 ## 用法
 
