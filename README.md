@@ -95,6 +95,8 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 <details>
 <summary>开发者 / 手动运行（不接 Agent 编排时才需要）</summary>
 
+> 以下都是**在终端直接敲的命令**（`node` / `bash`），**不需要 Agent**——适合开发者、定时任务，或想自己跑的人。它们和上面 Agent 走的是**同一套脚本**：用 Agent 时，是 Agent 在对话里问你问题、再替你执行这些命令。**普通用户可忽略本节。**
+
 安装并（可选）注册到宿主：
 
 ```bash
