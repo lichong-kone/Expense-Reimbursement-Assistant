@@ -90,9 +90,42 @@ bash reimburse.sh reimbursement.json
 
 Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
 
-> **增量**：`reimburse.sh` 自动维护一个状态文件（`<name>-state.json`），重复运行只处理新发票、跳过已处理的（按发票号+金额+日期去重）。连邮箱、只取新邮件的增量拉取由 Agent 环境负责；本状态文件保证“已处理不重复”。零依赖、离线。
+> **增量**：`reimburse.sh` 自动维护一个状态文件（`<name>-state.json`），重复运行只处理新发票、跳过已处理的（按发票号+金额+日期去重）。零依赖、离线。
 
 > 可选：`bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定），让宿主自动发现编排。
+
+## 两条使用路径
+
+本 Skill 提供两条路径，按"发票文本是否已提取好"选择：
+
+| 路径 | 适用 | 依赖 | 入口 |
+| --- | --- | --- | --- |
+| **A · 零依赖核心** | 宿主 Agent 已把发票解析成文本，只要政策整理与审核 | 仅 Node ≥ 18 | `reimburse.sh` / `portable-core.mjs` |
+| **B · 端到端自动收票（可选）** | 想让脚本自己从本地文件夹或邮箱收票、解析、审核、出正式 Excel | Node ≥ 18 + `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js` | `scripts/local-collector/` |
+
+路径 A 即上面的 `reimburse.sh` 用法。路径 B 由 Agent 调用**固定脚本**完成，不必每次即兴写脚本：
+
+```bash
+# 1) 引导式配置：选数据源 / 填路径 / 存员工基础信息（密码绝不入配置）
+node scripts/local-collector/setup.mjs                 # 交互式
+node scripts/local-collector/setup.mjs --mode mailbox --provider qq \
+  --name 张三 --employee-id K12345 --level staff \
+  --mailbox-user zhangsan@qq.com --password-env REBU_IMAP_PASS --print
+
+# 2) 邮箱网络预检：公司网络常拦截出站 IMAP 993，先验证连通性
+node scripts/local-collector/index.mjs --config ./sources.json --precheck
+
+# 3) 运行完整管线：收票 → 提取 → 政策审核 → 可选正式 Excel
+node scripts/local-collector/index.mjs --config ./sources.json --once
+```
+
+- **数据源可选** `local`（本地文件夹）/ `mailbox`（IMAP 自动收取）/ `both`。
+- **基础信息保存**到 `employee.json`，下次自动复用，无需重复输入。
+- **网络预检**两阶段（TCP → IMAP，带超时），受限网络会明确提示"可能被公司代理/SASE 拦截，请换网络或配代理"，而不是卡住。
+- **凭据安全**：IMAP 密码/授权码只走环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store，绝不写入 `sources.json`/日志/对话。
+- 连邮箱的增量只取新邮件由采集器的状态游标负责；若你的宿主本身已有邮件能力，也可继续用路径 A 只做整理与审核。
+
+详见 [采集器说明](scripts/local-collector/README.md)。
 
 ## 正式 Excel
 

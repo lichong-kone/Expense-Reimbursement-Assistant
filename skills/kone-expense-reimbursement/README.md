@@ -33,7 +33,8 @@ kone-expense-reimbursement/
 ├── examples/
 │   └── sample-input.json
 ├── scripts/
-│   └── run.sh
+│   ├── run.sh
+│   └── collect.mjs            ← 零依赖 inbox 参考管线（本地数据源模式，见 SKILL.md §8）
 ├── config.yaml
 ├── manifest.json
 ├── SKILL.md
@@ -85,6 +86,28 @@ node portable-core.mjs \
 - **宿主 Agent** 负责：邮箱连接、附件下载、PDF/OFD/XML 解析、OCR、凭据管理。
 - **本 Skill** 负责：公司政策、字段整理、合规审核、结构化输出。
 - **正式官方 Excel** 由随包的 `template-adapter/` 从官方模板保真渲染（只改授权单元格，其余逐字节保留；校验失败拒绝交付）。
+
+## 可选：本地数据源采集器与引导式配置
+
+除上面"宿主已提取文本 → `portable-core.mjs`"的**零依赖**路径外，仓库还在根目录 `scripts/local-collector/` 提供一条**端到端自动收票**路径,以及一个**引导式配置**脚本——让宿主 Agent 调用固定脚本完成配置,而不是每次即兴写脚本。详见 SKILL.md §8/§9 与 [采集器说明](../../scripts/local-collector/README.md)。
+
+```bash
+# 1) 引导式配置（写 sources.json + employee.json；密码绝不入配置）
+node scripts/local-collector/setup.mjs                       # 交互式
+node scripts/local-collector/setup.mjs --mode mailbox --provider qq \
+  --name 张三 --employee-id K12345 --level staff \
+  --mailbox-user me@qq.com --password-env REBU_IMAP_PASS --print
+
+# 2) 邮箱网络预检（公司网络常拦截出站 993）
+node scripts/local-collector/index.mjs --config ./sources.json --precheck
+
+# 3) 运行完整管线
+node scripts/local-collector/index.mjs --config ./sources.json --once
+```
+
+- 数据源：`local`（文件夹）/ `mailbox`（IMAP）/ `both`；员工信息保存到 `employee.json` 复用。
+- **依赖区别**：本目录的政策核心 `portable-core.mjs` 保持**零依赖**；采集器路径额外用到仓库已有的 `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js`。
+- 凭据只走环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store。
 
 ## 编程调用
 
