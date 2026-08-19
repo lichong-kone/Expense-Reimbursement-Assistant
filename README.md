@@ -67,84 +67,72 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 ---
 
-# 类别二 · 通用 Skill
+# 类别二 · 通用 Skill（任意 Agent，装上即用）
 
-平台中立、不依赖服务器、只需 Node 18+。Agent 装上后，用自身能力（读邮件、解析附件、OCR）配合本 Skill 的公司政策与审核逻辑，完成报销整理与结构化输出。
+不依赖服务器。把它装进你的 Agent，然后用**大白话**让它帮你报销——需要什么信息，Agent 在对话里问你；第一次问一遍，以后自动。
 
-> **Skill**：一个带 YAML frontmatter（`name`、`description`）的 `SKILL.md` 加同目录资源。安装即把该目录放到宿主的 skills 位置（Kiro `~/.kiro/skills/`；部分宿主 `~/.agents/skills/`；或宿主导入界面）。
+## 怎么用
 
-## 用法
+**第 1 步 · 安装**：把这个 Skill 装进你的 Agent（Kiro、WorkBuddy、Claude 等），重启/刷新一下即可。
 
-**推荐：装上 Skill，直接跟你的 Agent 说需求。** 例如"帮我整理这些发票报销"或"从我邮箱收发票并生成报销单"。Agent 会参考 `SKILL.md` **逐项询问**数据源、收件/输出路径、员工基础信息并保存，邮箱模式会**先做网络预检**，再**替你调用**下面的固定脚本——你不用手敲命令，也**不用先自己跑 sh**。引导流程见 SKILL.md §9。
+**第 2 步 · 说需求**：直接对 Agent 说，比如——
+- “帮我整理这个月的报销。”
+- “从我邮箱收发票，生成报销单。”
+- “这个文件夹里是我的发票，帮我报销。”
 
-底层按"发票文本是否已由宿主提取好"分两条路径，Agent 会替你选；想自己手动跑时也可直接用：
+**第 3 步 · 回答几个问题**：Agent 会问你几件事——你的**姓名 / 工号 / 级别**、发票**在哪**（本地文件夹，还是邮箱）。答完它就自动干活：收票 → 按公司政策审核 → 生成可递交的《费用报销单》。遇到**超标或缺信息**，它会在对话里问你怎么办（按标准报，还是按实际报并说明原因），你选一下就行。
 
-| 路径 | 适用 | 依赖 |
-| --- | --- | --- |
-| **A · 零依赖核心** | 宿主已把发票解析成文本，只要政策整理与审核 | 仅 Node ≥ 18 |
-| **B · 端到端自动收票（可选）** | 让脚本自己从本地文件夹或邮箱收票、解析、审核、出正式 Excel | Node ≥ 18 + `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js` |
+你**不用装依赖、不用记命令、不用自己跑脚本**——这些 Agent 替你完成；“从本地还是从邮箱、怎么取”也由它根据你的回答判断，你不用操心。
+
+### 以后更省事
+
+姓名/工号/级别这些**只填一次**，存在你本机。以后直接说“整理这次的报销”，Agent 自动读取、只处理**新发票**、直接出结果，不再重复问。
+
+### 关于邮箱
+
+选“从邮箱收”时，Agent 会**先确认能不能连上你的邮箱**（公司网络有时会拦）。连不上会直接告诉你原因、教你怎么办（比如换个网络，或按公司代理设置再试），不会卡住。你的**邮箱密码/授权码只在本机安全存放**，不会写进文件，也不会出现在对话里。
 
 <details>
-<summary><b>手动 / CLI 用法 · 路径 A（零依赖核心）</b></summary>
+<summary>开发者 / 手动运行（不接 Agent 编排时才需要）</summary>
+
+安装并（可选）注册到宿主：
 
 ```bash
 git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
+bash install.sh              # 自动探测 ~/.kiro/skills 或 ~/.agents/skills，或用 --dest 指定
+```
+
+**发票文本已提取好**（只要政策整理 + 审核，零依赖、离线）：
+
+```bash
 bash reimburse.sh reimbursement.json
 ```
 
-- 第 1 次：生成骨架 `reimbursement.json`，填入员工、行程、已提取的发票文本。
-- 第 2 次：生成审核包 `reimbursement-output/`；如有超标项，在其中 `review-decisions.template.json` 填写每项 `action`（`keep`/`adjust`/`exempt`+原因/`provide_info`/`defer`）。
-- 第 3 次：检测到决定已填，自动应用，产出 `reimbursement-reviewed/`（含实际/可报销总额、已应用决定）。
+反复运行同一条命令即可推进：首次生成骨架 → 填入员工/行程/发票文本；再次生成审核包（在 `review-decisions.template.json` 填每项决定 `keep/adjust/exempt/provide_info/defer`）；决定填好后自动应用并从随包官方模板生成可递交的正式 Excel。
 
-Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。增量：`reimburse.sh` 自动维护状态文件（`<name>-state.json`），重复运行只处理新发票。可选 `bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定）。
-</details>
-
-<details>
-<summary><b>手动 / CLI 用法 · 路径 B（端到端自动收票，可选）</b></summary>
+**让脚本自己收票 + 解析**（本地文件夹或邮箱；用到 `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js`）：
 
 ```bash
-# 1) 引导式配置：选数据源 / 填路径 / 存员工基础信息（密码绝不入配置）
-node scripts/local-collector/setup.mjs                 # 交互式
-node scripts/local-collector/setup.mjs --mode mailbox --provider qq \
-  --name 张三 --employee-id K12345 --level staff \
-  --mailbox-user zhangsan@qq.com --password-env REBU_IMAP_PASS --print
-
-# 2) 邮箱网络预检：公司网络常拦截出站 IMAP 993，先验证连通性
-node scripts/local-collector/index.mjs --config ./sources.json --precheck
-
-# 3) 运行完整管线：收票 → 提取 → 政策审核 → 可选正式 Excel
-node scripts/local-collector/index.mjs --config ./sources.json --once
+node scripts/local-collector/setup.mjs                                        # 引导式配置（密码不入配置）
+node scripts/local-collector/index.mjs --config ./sources.json --precheck     # 邮箱网络预检
+node scripts/local-collector/index.mjs --config ./sources.json --once         # 收票→提取→审核→可选 Excel
 ```
 
-- 数据源 `local`（文件夹）/ `mailbox`（IMAP）/ `both`；员工信息存 `employee.json` 复用。
-- 网络预检两阶段（TCP → IMAP，带超时），受限网络明确提示"可能被公司代理/SASE 拦截，请换网络或配代理"，不会卡住。
-- 凭据只走环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store，绝不写入 `sources.json`/日志/对话。
+数据源 `local`/`mailbox`/`both`；员工信息存 `employee.json` 复用；IMAP 密码只走环境变量（默认 `REBU_IMAP_PASS`）。正式 Excel 从官方模板保真渲染（只改授权单元格，其余逐字节保留，校验不过拒绝交付）。详见 [采集器说明](scripts/local-collector/README.md) 与 [通用 Skill 说明](skills/kone-expense-reimbursement/README.md)。
 </details>
-
-详见 [采集器说明](scripts/local-collector/README.md)。
-
-## 正式 Excel
-
-`reimburse.sh` 在整理与审核完成后，从随包的公司官方模板直接生成**可递交的正式《费用报销单》Excel**（首次会自动安装渲染依赖 `adm-zip`）。正式 Excel 从官方模板副本写入，只改授权单元格，其余公式/样式/合并/勾选框/打印设置逐字节保留；模板 SHA-256 或映射版本不匹配、保真校验失败时拒绝交付。产物含 `bundle-summary.md`（是否可递交）与 `bundle-manifest.json`（版本与 hash）。
-
-也可手动渲染：
-
-```bash
-node skills/kone-expense-reimbursement/template-adapter/install-or-verify.mjs   # 校验完整性
-node skills/kone-expense-reimbursement/template-adapter/bundle.mjs \
-  --template-input <name>-output/template-input.json --output-dir <name>-excel
-```
-
-详见 [通用 Skill 说明](skills/kone-expense-reimbursement/README.md)。
 
 ---
 
-## 各类第三方 Agent 通用安装说明
+## 在不同 Agent 里怎么装
 
-- **支持 Skill 目录的宿主（Kiro、WorkBuddy）**：复制整个 Skill 目录到宿主 skills 目录后重启/刷新。
-- **仅支持 MCP 的客户端（Claude Desktop、Cline、Continue）**：按类别一配置 `rebu` MCP；通用 Skill 的整理/审核在本机运行 `portable-core.mjs`，把 `SKILL.md` 作为系统提示注入。
+<details>
+<summary>各类宿主的安装方式（技术说明）</summary>
+
+- **支持 Skill 目录的宿主（Kiro、WorkBuddy）**：把整个 Skill 目录复制到宿主 skills 目录后重启/刷新。
+- **仅支持 MCP 的客户端（Claude Desktop、Cline、Continue）**：按类别一配置 `rebu` MCP；通用 Skill 的整理/审核在本机运行，把 `SKILL.md` 作为系统提示注入。
 - **自研 Agent**：读 `manifest.json` 发现能力与输入输出契约。
+</details>
 
 ## 说明
 
