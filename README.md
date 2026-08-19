@@ -53,13 +53,10 @@
 
 > 下载地址或 `REBU_API_BASE` 打不开 = 服务地址已变更，回本 README 查最新地址。
 
-**2.2 安装服务型 Skill**（本仓库已含文件）：
+**2.2 安装服务型 Skill**（本仓库已含文件）：把 `skills/rebu-expense-agent` 目录装进你的宿主——用宿主的“导入 / 添加 Skill”功能，或直接把该文件夹复制到宿主的 skills 目录，然后重启 / 刷新。**Windows、macOS、Linux 都适用**：
 
-```bash
-git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
-bash Expense-Reimbursement-Assistant/install.sh --skill service
-# 或手动复制： cp -R Expense-Reimbursement-Assistant/skills/rebu-expense-agent <你的宿主 skills 目录>/
-```
+- **获取文件**：GitHub 页面点 **Code → Download ZIP** 解压即可；有 Git 也可 `git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git`。
+- **放进宿主**：把 `skills/rebu-expense-agent` 整个文件夹复制到宿主的 skills 目录（**Windows** 用资源管理器拖放，**macOS/Linux** 用 Finder 或文件管理器），或用宿主的“导入 Skill”界面选中该文件夹。
 
 **2.3 使用**：连接后说“连接报销服务：先检查配置和待办，再同步最近发票”。流程在批量处理前说明范围与撤销方式，按“已自动处理 / 仍需决定 / 下一步”交付；审核动作统一为 `keep` / `adjust` / `exempt` / `provide_info` / `defer`。凭据一律走宿主 Secret Store / 安全输入 / 环境变量。
 
