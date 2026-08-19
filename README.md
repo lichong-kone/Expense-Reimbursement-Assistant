@@ -75,12 +75,21 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 ## 用法
 
-克隆一次，然后反复运行同一条命令，脚本自动推进：
+**推荐：装上 Skill，直接跟你的 Agent 说需求。** 例如"帮我整理这些发票报销"或"从我邮箱收发票并生成报销单"。Agent 会参考 `SKILL.md` **逐项询问**数据源、收件/输出路径、员工基础信息并保存，邮箱模式会**先做网络预检**，再**替你调用**下面的固定脚本——你不用手敲命令，也**不用先自己跑 sh**。引导流程见 SKILL.md §9。
+
+底层按"发票文本是否已由宿主提取好"分两条路径，Agent 会替你选；想自己手动跑时也可直接用：
+
+| 路径 | 适用 | 依赖 |
+| --- | --- | --- |
+| **A · 零依赖核心** | 宿主已把发票解析成文本，只要政策整理与审核 | 仅 Node ≥ 18 |
+| **B · 端到端自动收票（可选）** | 让脚本自己从本地文件夹或邮箱收票、解析、审核、出正式 Excel | Node ≥ 18 + `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js` |
+
+<details>
+<summary><b>手动 / CLI 用法 · 路径 A（零依赖核心）</b></summary>
 
 ```bash
 git clone --depth 1 https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
-
 bash reimburse.sh reimbursement.json
 ```
 
@@ -88,22 +97,11 @@ bash reimburse.sh reimbursement.json
 - 第 2 次：生成审核包 `reimbursement-output/`；如有超标项，在其中 `review-decisions.template.json` 填写每项 `action`（`keep`/`adjust`/`exempt`+原因/`provide_info`/`defer`）。
 - 第 3 次：检测到决定已填，自动应用，产出 `reimbursement-reviewed/`（含实际/可报销总额、已应用决定）。
 
-Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。
+Node ≥ 18，零依赖，离线。输出含 `summary.md`、政策报告、审核问题、`template-input.json`、`host-contract.json`、审计与 SHA-256 manifest。增量：`reimburse.sh` 自动维护状态文件（`<name>-state.json`），重复运行只处理新发票。可选 `bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定）。
+</details>
 
-> **增量**：`reimburse.sh` 自动维护一个状态文件（`<name>-state.json`），重复运行只处理新发票、跳过已处理的（按发票号+金额+日期去重）。零依赖、离线。
-
-> 可选：`bash install.sh` 把 Skill 注册进宿主（自动探测 `~/.kiro/skills` 或 `~/.agents/skills`，或 `--dest` 指定），让宿主自动发现编排。
-
-## 两条使用路径
-
-本 Skill 提供两条路径，按"发票文本是否已提取好"选择：
-
-| 路径 | 适用 | 依赖 | 入口 |
-| --- | --- | --- | --- |
-| **A · 零依赖核心** | 宿主 Agent 已把发票解析成文本，只要政策整理与审核 | 仅 Node ≥ 18 | `reimburse.sh` / `portable-core.mjs` |
-| **B · 端到端自动收票（可选）** | 想让脚本自己从本地文件夹或邮箱收票、解析、审核、出正式 Excel | Node ≥ 18 + `imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js` | `scripts/local-collector/` |
-
-路径 A 即上面的 `reimburse.sh` 用法。路径 B 由 Agent 调用**固定脚本**完成，不必每次即兴写脚本：
+<details>
+<summary><b>手动 / CLI 用法 · 路径 B（端到端自动收票，可选）</b></summary>
 
 ```bash
 # 1) 引导式配置：选数据源 / 填路径 / 存员工基础信息（密码绝不入配置）
@@ -119,11 +117,10 @@ node scripts/local-collector/index.mjs --config ./sources.json --precheck
 node scripts/local-collector/index.mjs --config ./sources.json --once
 ```
 
-- **数据源可选** `local`（本地文件夹）/ `mailbox`（IMAP 自动收取）/ `both`。
-- **基础信息保存**到 `employee.json`，下次自动复用，无需重复输入。
-- **网络预检**两阶段（TCP → IMAP，带超时），受限网络会明确提示"可能被公司代理/SASE 拦截，请换网络或配代理"，而不是卡住。
-- **凭据安全**：IMAP 密码/授权码只走环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store，绝不写入 `sources.json`/日志/对话。
-- 连邮箱的增量只取新邮件由采集器的状态游标负责；若你的宿主本身已有邮件能力，也可继续用路径 A 只做整理与审核。
+- 数据源 `local`（文件夹）/ `mailbox`（IMAP）/ `both`；员工信息存 `employee.json` 复用。
+- 网络预检两阶段（TCP → IMAP，带超时），受限网络明确提示"可能被公司代理/SASE 拦截，请换网络或配代理"，不会卡住。
+- 凭据只走环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store，绝不写入 `sources.json`/日志/对话。
+</details>
 
 详见 [采集器说明](scripts/local-collector/README.md)。
 
