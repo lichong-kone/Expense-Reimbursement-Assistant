@@ -92,8 +92,6 @@ bash Expense-Reimbursement-Assistant/install.sh --skill service
 
 选“从邮箱收”时，Agent 会**先确认能不能连上你的邮箱**（公司网络有时会拦）。连不上会直接告诉你原因、教你怎么办（比如换个网络，或按公司代理设置再试），不会卡住。你的**邮箱密码/授权码只在本机安全存放**，不会写进文件，也不会出现在对话里。
 
-> 有能力自己跑或想做自动化的开发者：脚本都在 Skill 目录内（`scripts/`、`template-adapter/`），可自行取用；**普通用户无需关心，交给 Agent 即可。**
-
 ---
 
 ## 在不同 Agent 里怎么装
