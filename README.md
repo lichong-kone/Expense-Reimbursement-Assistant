@@ -1,30 +1,12 @@
 # Expense Reimbursement Assistant（报销助手）
 
-帮你整理发票、按公司政策审核、生成可递交的《费用报销单》。有两种用法：
+帮你整理发票、按公司政策审核、生成可递交的《费用报销单》。两种用法：
 
-- **类别二 · 通用 Skill**：任意 Agent，装个 Skill 就能用，不连服务器。**多数人用这个。**
 - **类别一 · 在线服务**：连 REBU 服务器，网页或支持 MCP 的 Agent，数据在线持久化。
+- **类别二 · 通用 Skill**：任意 Agent，装个 Skill 就能用，不连服务器。
 
-> 服务地址当前 `https://metagentictool.com`，可能变更；打不开就回本 README 看最新地址。
-
----
-
-# 类别二 · 通用 Skill（装上即用）
-
-## 安装
-
-把 `skills/kone-expense-reimbursement` 文件夹放进你 Agent 的 skills 目录，重启 / 刷新。**不用装 MCP、不用跑脚本，Windows / macOS / Linux 一样。**
-
-- **拿文件**：本仓库 GitHub 页面 → **Code → Download ZIP** 解压（或 `git clone`）。
-- **放哪里**：Kiro 放 `~/.kiro/skills/`（Windows：`%USERPROFILE%\.kiro\skills\`）；有“导入 / 添加 Skill”界面的宿主，直接选这个文件夹。
-
-## 用法
-
-1. 对 Agent 说需求，比如“帮我整理这个月的报销”“从我邮箱收发票，生成报销单”。
-2. Agent 问你几件事——**姓名 / 工号 / 级别**、发票**在哪**（文件夹还是邮箱）。答完它就自动：收票 → 按政策审核 → 生成《费用报销单》。超标或缺信息，它会在对话里问你怎么办。
-3. 基础信息**只填一次**，存本机；以后直接说“整理这次的报销”，自动只处理新发票。
-
-> 选邮箱时，连不上会告诉你原因（公司网络常拦，换网络或按公司代理再试）。邮箱密码 / 授权码只在本机安全存放，不进文件、不进对话。
+> 开始前：电脑终端能跑 `git` 和 `node`（Node 18+）；没有就先装 [Git](https://git-scm.com/downloads)、[Node.js](https://nodejs.org)。
+> 服务地址当前 `https://metagentictool.com`；打不开就回本 README 看最新地址。
 
 ---
 
@@ -38,11 +20,17 @@
 
 ## 入口 2 · 支持 MCP 的 Agent
 
-需要装两样：
+**① 装 Skill：**
 
-**① 装 Skill**：把 `skills/rebu-expense-agent` 文件夹放进你 Agent 的 skills 目录（放法同类别二），重启。
+```bash
+git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
+cd Expense-Reimbursement-Assistant
+bash install.sh --skill service
+```
 
-**② 装 MCP**：把下面加到你客户端的 MCP 配置里，保存后重启：
+自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装好后重启 Agent。Windows 用 Git Bash 或 WSL 跑同样命令。（报错找不到目录就加 `--dest ~/.kiro/skills`。）
+
+**② 配 MCP：** 打开你 Agent 的配置文件（位置见下），把下面这段粘贴进去，保存后重启：
 
 ```json
 {
@@ -63,5 +51,26 @@
 
 ---
 
-- 本仓库含使用文档、可安装 Skill、一个公司官方报销 Excel 模板；不含政策原文 PDF 与后端代码。
-- 密码 / 授权码只在网页或宿主安全输入，别写进聊天、截图或公开渠道。
+# 类别二 · 通用 Skill（装上即用）
+
+## 安装
+
+```bash
+git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
+cd Expense-Reimbursement-Assistant
+bash install.sh
+```
+
+自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装完重启 / 刷新 Agent。Windows 用 Git Bash 或 WSL 跑同样命令。（报错找不到目录就加 `--dest ~/.kiro/skills`。）**不用配 MCP。**
+
+## 用法
+
+1. 对 Agent 说需求，比如“帮我整理这个月的报销”“从我邮箱收发票，生成报销单”。
+2. Agent 问你几件事——**姓名 / 工号 / 级别**、发票**在哪**（文件夹还是邮箱）。答完它就自动：收票 → 按政策审核 → 生成《费用报销单》。超标或缺信息，它会在对话里问你怎么办。
+3. 基础信息**只填一次**，存本机；以后直接说“整理这次的报销”，自动只处理新发票。
+
+> 选邮箱时，连不上会告诉你原因（公司网络常拦，换网络或按公司代理再试）。邮箱密码 / 授权码只在本机安全存放，不进文件、不进对话。
+
+---
+
+> 密码 / 授权码只在网页或宿主安全输入，别写进聊天、截图或公开渠道。
