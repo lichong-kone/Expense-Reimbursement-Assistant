@@ -256,6 +256,36 @@ function detectInvoiceType(text) {
   return 'other';
 }
 
+// ─── Supporting-document detection (SKILL.md §二) ────────────────────
+// Itineraries (行程单), hotel folios/checkout statements (水单/结账单/结算单),
+// consumption details (消费明细) etc. accompany a MAIN invoice as supporting
+// documents. They MUST NOT be counted as independent reimbursable amounts,
+// otherwise the same trip is double-counted (e.g. 打车发票 + 行程单、酒店发票 + 水单).
+const SUPPORT_DOC_KEYWORDS = ['行程单', '水单', '消费明细', '结账单', '结算单', 'folio', 'itinerary'];
+const SUPPORT_DOC_RE = new RegExp(SUPPORT_DOC_KEYWORDS.join('|'), 'i');
+
+/**
+ * Classify an item as a supporting document vs. a reimbursable invoice.
+ * The strongest counter-signal is a genuine invoice number (发票号码).
+ * Returns { isSupportingDoc, ambiguous }:
+ *  - isSupportingDoc=true  → exclude from amount totals (confident).
+ *  - ambiguous=true        → keyword hit BUT also has an invoice number →
+ *                            keep counted, flag need_confirm (never silently drop a real invoice).
+ */
+function classifySupportingDoc(invoice, fields) {
+  const nameHit = SUPPORT_DOC_RE.test(invoice.fileName || '') || SUPPORT_DOC_RE.test(invoice.emailSubject || '');
+  const textHit = SUPPORT_DOC_RE.test(`${invoice.rawText || ''}\n${invoice.emailBody || ''}`);
+  const hasInvoiceNo = !!fields.invoiceNumber;
+
+  if ((nameHit || textHit) && hasInvoiceNo) {
+    return { isSupportingDoc: false, ambiguous: true };
+  }
+  if ((nameHit || textHit) && !hasInvoiceNo) {
+    return { isSupportingDoc: true, ambiguous: false };
+  }
+  return { isSupportingDoc: false, ambiguous: false };
+}
+
 const AMOUNT_RE = /[¥￥]\s*(\d{1,7}(?:[.,]\d{1,2}))/g;
 const AMOUNT_KEYWORD_RE = /(?:金额|价税合计|合计|总额|amount|total)[：:\s]*(\d{1,7}(?:[.,]\d{1,2}))/gi;
 const DATE_RE = /(\d{4})[年\-/.](\d{1,2})[月\-/.](\d{1,2})[日号]?/g;
@@ -621,6 +651,7 @@ export function checkPolicy(invoice, employeeLevel, snapshot) {
 function detectSuspectedDuplicates(results) {
   const groups = new Map(); // key -> [ids]
   for (const r of results) {
+    if (r.fields.isSupportingDoc) continue; // supporting docs aren't invoices
     const num = r.fields.invoiceNumber || '';
     const amt = r.fields.totalAmount ?? r.fields.amount ?? '';
     const date = r.fields.invoiceDate || '';
@@ -793,12 +824,18 @@ const LIMITED_CATEGORIES = ['meal', 'hotel'];
 function aggregateByDateCategory(results, employeeLevel, snapshot) {
   const groups = []; // { groupKey, category, date, invoiceIds, actualAmount, standardAmount, exceedAmount, reimbursableAmount, settlement, reason }
   const perTicketRows = []; // non-limited items
+  const supportingDocs = []; // SKILL.md §二: excluded from amounts
 
   // Build map: key -> [invoiceResult]
   const dateMap = new Map(); // "date|category" -> [result]
   const missingDateItems = [];
 
   for (const r of results) {
+    // Supporting documents (行程单/水单/结账单…) never contribute to amounts.
+    if (r.fields.isSupportingDoc) {
+      supportingDocs.push(r);
+      continue;
+    }
     const type = r.fields.invoiceType || r.fields.expenseCategory || 'other';
     if (!LIMITED_CATEGORIES.includes(type)) {
       perTicketRows.push(r);
@@ -885,7 +922,7 @@ function aggregateByDateCategory(results, employeeLevel, snapshot) {
     });
   }
 
-  return { groups, perTicketRows, missingDateItems };
+  return { groups, perTicketRows, missingDateItems, supportingDocs };
 }
 
 /**
@@ -1219,8 +1256,20 @@ function generateSummaryMd(input, draft, report, policyFindings, reviewQuestions
     const amt = item.fields.totalAmount ?? item.fields.amount ?? 0;
     lines.push(`| ${i + 1} | ${item.id} | ${item.fields.invoiceType || 'other'} | ¥${amt.toFixed(2)} | ${item.status} |`);
   });
-  lines.push(`\n**Actual Total**: ¥${draft.totalAmount.toFixed(2)} (${draft.items.length} invoices)`);
+  lines.push(`\n**Actual Total**: ¥${draft.totalAmount.toFixed(2)} (${draft.items.filter(i => !i.fields.isSupportingDoc).length} invoices)`);
   lines.push(`**Reimbursable Total**: ¥${draft.reimbursableAmount.toFixed(2)}\n`);
+
+  // Supporting documents excluded from amounts (SKILL.md §二)
+  const supportingItems = draft.items.filter(i => i.fields.isSupportingDoc);
+  if (supportingItems.length > 0) {
+    lines.push('## 支持件（不计入金额）\n');
+    lines.push('以下识别为主发票的支持件（行程单 / 水单 / 结账单 / 消费明细等），已排除、不重复计入报销金额：');
+    for (const it of supportingItems) {
+      const amt = it.fields.totalAmount ?? it.fields.amount ?? 0;
+      lines.push(`- ${it.id}（${it.fields.invoiceType || 'other'}，票面 ¥${amt.toFixed(2)}，仅作佐证）`);
+    }
+    lines.push('');
+  }
 
   // Aggregation summary
   if (aggregation && aggregation.groups.length > 0) {
@@ -1345,9 +1394,21 @@ export async function processInput(input, options = {}) {
       : 0.1;
 
     const missing = missingRequiredFields(fields.invoiceType, fields);
-    const status = deriveStatus(fields.invoiceType, fields, confidence);
+    let status = deriveStatus(fields.invoiceType, fields, confidence);
 
-    return { id, status, fields, missingFields: missing, confidence, extractionLayers: layers };
+    // SKILL.md §二: supporting-document detection — exclude from amount totals.
+    const support = classifySupportingDoc(inv, fields);
+    fields.isSupportingDoc = support.isSupportingDoc;
+    let role = 'invoice';
+    if (support.isSupportingDoc) {
+      role = 'supporting_document';
+      status = 'supporting';
+    } else if (support.ambiguous) {
+      status = 'need_confirm';
+      if (!missing.includes('suspected_supporting_doc')) missing.push('suspected_supporting_doc');
+    }
+
+    return { id, status, role, fields, missingFields: missing, confidence, extractionLayers: layers };
   });
 
   // 1b. Cross-run incremental dedup (optional --state): skip invoices whose
@@ -1383,9 +1444,10 @@ export async function processInput(input, options = {}) {
     }
   }
 
-  // 3. Policy checks
+  // 3. Policy checks (supporting documents are not reimbursable → skip)
   let allChecks = [];
   for (const r of results) {
+    if (r.fields.isSupportingDoc) continue;
     const checks = checkPolicy(r, employeeLevel, snapshot);
     allChecks.push(...checks);
   }
