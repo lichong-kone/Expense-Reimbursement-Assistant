@@ -358,7 +358,7 @@ node scripts/local-collector/index.mjs --config ./sources.json --once
 
 - 预检两阶段：TCP 连到 `host:port`（超时 8s）→ imapflow 连接并 `list()`（超时 15s）。
 - 失败分类与话术：
-  - **端口不可达 / 超时**（`ETIMEDOUT`/`ECONNREFUSED`）：告诉用户"可能是公司网络或代理拦截了出站邮箱端口（993/143）。请切换到不受限网络（如手机热点）或按公司代理配置后重试。"
+  - **端口不可达 / 超时**（`ETIMEDOUT`/`ECONNREFUSED`）：告诉用户"可能是公司安全策略（Prisma Access/SASE）拦了外部邮箱端口（993/143）；受控电脑换网络（含手机热点）通常也绕不过。建议改用本地文件夹模式（无需邮箱），或用未纳管设备，或联系 IT 放行。"
   - **认证失败**：提示"邮箱账号或 IMAP 授权码不正确"，**不回显**任何凭据。
   - **域名解析失败**（`ENOTFOUND`）：提示检查 IMAP 服务器地址。
 - `mode=both` 且预检失败：自动降级为只处理本地 inbox，并告警邮箱这次跳过。

@@ -87,8 +87,9 @@ export function classifyConnectError(err, stage = 'imap') {
     return {
       code: code || 'ETIMEDOUT',
       hint:
-        '可能是公司网络或代理（如 Palo Alto Prisma Access / SASE）拦截了出站邮箱端口（993/143）。' +
-        '请切换到不受限网络（例如手机热点），或按公司代理配置后重试。',
+        '可能是公司安全策略（如 Prisma Access/SASE）拦截了外部邮箱端口（993/143）。' +
+        '受控电脑换网络（含手机热点）通常也绕不过——流量仍走公司安全网关。' +
+        '建议改用「本地文件夹」模式（无需邮箱），或换未纳管的个人设备，或联系 IT 放行。',
     };
   }
 
