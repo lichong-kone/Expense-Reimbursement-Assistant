@@ -35,6 +35,25 @@ cli:
   validate: "--validate --input <path>"
   run: "--input <path> [--output-dir <dir>] [--decisions <path>] [--state <path>]"
 
+# Local datasource + onboarding (Spec §6.8.6.11–12). These entry points let a host
+# Agent run FIXED scripts for setup / precheck / collection instead of improvising.
+datasource:
+  setup:
+    entryPoint: ../../scripts/local-collector/setup.mjs
+    description: "Guided onboarding — persists sources.json + employee.json. Interactive or non-interactive flags. Never writes credentials."
+    cli: "--mode local|mailbox|both [--provider qq|163|126|gmail|outlook|yeah] [--name ...] [--mailbox-user ...] [--password-env VAR] [--print] [--show]"
+  precheck:
+    entryPoint: ../../scripts/local-collector/index.mjs
+    description: "Mailbox connectivity precheck (TCP + IMAP, with timeouts). Reports corporate-network/proxy blocking clearly."
+    cli: "--config <sources.json> --precheck"
+  collect:
+    entryPoint: ../../scripts/local-collector/index.mjs
+    description: "End-to-end pipeline: mailbox fetch (with precheck) → extract → policy review → optional formal Excel."
+    cli: "--config <sources.json> [--once|--watch <seconds>]"
+  modes: [local, mailbox, both]
+  requiresDeps: [imapflow, pdf-parse, adm-zip, tesseract.js]
+  credentials: "IMAP password/auth-code via env var only (default REBU_IMAP_PASS) or host Secret Store; never in sources.json/logs."
+
 resources:
   policyRules: resources/policy-rules.json
 

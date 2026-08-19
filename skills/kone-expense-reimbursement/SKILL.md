@@ -193,3 +193,181 @@ v1.2.0 新增：
 5. **manifest.json**：新增 `skillVersion`、`hostContractVersion`；`outputHashes` 包含 host-contract.json。
 
 6. **无破坏性变更**：`keep/exempt/adjust/provide_info/defer` 行为不变。既有 decisions 文件可继续读取。
+
+## 八、本地数据源模式（Local Datasource Mode, Spec §6.8.6）
+
+除直接调用 portable-core.mjs 外，本 Skill 支持**本地数据源模式**——定期从数据源采集发票、整理、在本地文件夹生成正式报销文件，无需 Web 服务器。
+
+### 8.1 核心模型
+
+```
+[填充器: local / mailbox] ──→ inboxDir/ ──→ [宿主提取] ──→ [portable-core] ──→ [template-adapter] ──→ outputDir/
+```
+
+- **inboxDir**：统一收件文件夹。所有数据源填充器把发票文件放入此目录。
+- **outputDir**：审核包与正式 Excel 输出。
+
+### 8.2 数据源选择
+
+两类填充器可独立或并行使用：
+
+| 填充器 | 说明 | 网络 |
+|--------|------|------|
+| `local` | 用户手动或文件同步把发票文件放入 inboxDir | 无需 |
+| `mailbox` | 宿主 agent 通过 IMAP 定时下载发票邮件附件到 inboxDir | 需要 |
+
+配置 `sources.json`（放在工作目录）：
+
+```json
+{
+  "version": "1.0.0",
+  "mode": "local",
+  "inboxDir": "./inbox",
+  "outputDir": "./output",
+  "schedule": "daily",
+  "mailbox": {
+    "enabled": false,
+    "folder": "INBOX",
+    "subjectFilter": "发票|报销|invoice",
+    "lookbackDays": 30
+  }
+}
+```
+
+- `mode`: `"local"` | `"mailbox"` | `"both"`
+- **IMAP 凭据**必须通过环境变量（`REBU_IMAP_USER` / `REBU_IMAP_PASS` / `REBU_IMAP_HOST` / `REBU_IMAP_PORT`）或宿主 Secret Store 提供，**不入 sources.json**。
+
+### 8.3 inbox 文件约定
+
+宿主 agent 或用户须将发票**提取为文本/JSON**后放入 inboxDir：
+
+- **`.json` 文件**：符合 PortableSkillInput.invoices[*] 单项结构：
+  ```json
+  { "id": "inv_1", "rawText": "增值税...", "emailSubject": "...", "fileName": "..." }
+  ```
+- **`.txt` 文件**：纯文本内容视为 `rawText`。
+- **`manifest.json`（可选）**：列出所有条目及其元数据。
+
+> PDF/OFD/XML/OCR 的原始二进制解析由宿主 agent 负责。本模式不做二进制解析。
+
+### 8.4 参考管线用法
+
+```bash
+cd skills/kone-expense-reimbursement
+
+# 使用 sources.json 配置（自动读取 inbox、output、state 路径）
+node scripts/collect.mjs --config ./sources.json
+
+# 直接指定路径
+node scripts/collect.mjs --inbox ./inbox --output ./output --state ./state.json
+
+# 仅扫描报告，不执行
+node scripts/collect.mjs --inbox ./inbox --dry-run
+```
+
+员工/行程信息：
+- 放 `employee.json` 和 `trip.json` 在工作目录，或通过 `--employee` / `--trip` 指定路径。
+- 也可通过环境变量：`REBU_EMPLOYEE_NAME`、`REBU_EMPLOYEE_ID`、`REBU_LEVEL` 等。
+
+### 8.5 增量去重
+
+使用 `--state ./state.json` 实现跨运行增量。已处理发票的业务键写入状态文件，下次运行自动跳过。状态文件不含原始票据文本或凭据。
+
+### 8.6 定时调度
+
+定时执行由 OS 或宿主负责，参考：
+
+```bash
+# macOS launchd / cron 示例（每天 9:00 执行）
+0 9 * * * cd /path/to/workspace && node skills/kone-expense-reimbursement/scripts/collect.mjs --config ./sources.json
+```
+
+### 8.7 生成正式 Excel
+
+当 portable-core 无待决项时，参考管线会提示如何调用 template-adapter：
+
+```bash
+node template-adapter/bundle.mjs \
+  --template-input ./output/template-input.json \
+  --output-dir ./output/bundle \
+  --repo-root <仓库根目录>
+```
+
+需已获授权的公司官方模板（见 §7.6）。
+
+### 8.8 边界
+
+- 不依赖 Web/服务器/数据库
+- 零 npm 依赖
+- PDF/OFD/XML/OCR 不在范围
+- 不修改 src/server/**
+- 凭据只走环境变量/Secret Store
+
+---
+
+## 九、Agent 交互流程与首次配置（Onboarding, Spec §6.8.6.11–12）
+
+> 目标：用户装好 Skill 后，**由宿主 Agent 引导完成配置**（选数据源、填路径、存基础信息、验网络），而不是让用户手写 `sources.json`，也不是让 Agent 每次即兴写脚本。Agent 应调用下列**固定脚本**：`setup.mjs`（配置）→ `--precheck`（网络）→ 采集器（运行）。
+
+### 9.1 何时进入 Onboarding
+- 用户第一次说"整理报销 / 从邮箱收发票 / 定期报销"且工作目录无 `sources.json`。
+- 用户要求"重新配置 / 换邮箱 / 改收件夹路径"。
+
+### 9.2 标准对话步骤（Agent 逐步引导）
+
+1. **选数据源**（必答）：
+   - "发票从哪来？① 本地文件夹（我把发票放进去）② 邮箱自动收取 ③ 两者都要"
+   - 映射到 `--mode local | mailbox | both`。
+2. **本地路径**（local/both）：
+   - 问 inbox 文件夹与 output 输出目录（给默认值 `./inbox`、`./output`，用户可回车接受）。
+3. **基础信息**（必答，会被保存复用）：
+   - 姓名、工号、部门、职位、成本中心、员工级别（`staff/manager/assistant_director/director/evp`）。
+   - 写入 `employee.json`，下次自动加载，无需重复输入。
+4. **邮箱信息**（mailbox/both）：
+   - 服务商（`qq/163/126/gmail/outlook/yeah` 之一 → 自动带出 host/port/secure），或自定义 host/port。
+   - 邮箱账号、IMAP 文件夹（默认 `INBOX`）、首次回溯天数（默认 30）。
+   - **密码/授权码不进对话、不进配置**：Agent 告诉用户设置环境变量（默认 `REBU_IMAP_PASS`），只把变量名记进 `sources.json` 的 `mailbox.passwordEnv`。若宿主有 Secret Store，走安全输入通道。
+5. **写配置**：Agent 用**非交互 flag** 一次性调用 `setup.mjs` 生成 `sources.json`(+`employee.json`)；先用 `--print` 预览给用户确认，再落盘。
+6. **网络预检**（含 mailbox 时必做）：调用 `--precheck`。失败按 §9.4 处理。
+7. **运行**：调用采集器跑完整管线；有待决项则回到人机协作（§六）。
+
+### 9.3 Agent 调用的固定命令（非交互）
+
+```bash
+# 1) 生成配置（示例：邮箱模式，QQ 邮箱）
+node scripts/local-collector/setup.mjs \
+  --mode mailbox --provider qq \
+  --name 张三 --employee-id K12345 --department IT --position Engineer \
+  --cost-center CC100 --level staff \
+  --mailbox-user zhangsan@qq.com --mailbox-folder INBOX --since-days 30 \
+  --password-env REBU_IMAP_PASS \
+  --workdir .            # 先加 --print 预览，确认后去掉 --print 落盘
+
+# 2) 网络预检（不下载，仅验证连通性与凭据）
+node scripts/local-collector/index.mjs --config ./sources.json --precheck
+
+# 3) 运行完整管线（采集→提取→政策审核→可选正式 Excel）
+node scripts/local-collector/index.mjs --config ./sources.json --once
+```
+
+> 纯本地模式：把 `--mode mailbox` 换成 `--mode local`，省略所有 `--mailbox-*` 与 `--password-env`。
+
+### 9.4 邮箱网络预检与受限网络处理（Spec §6.8.6.11）
+
+在公司网络里连接外部邮箱经常失败（如 KONE 走 Palo Alto Prisma Access/SASE，出站 IMAP 993 被网关拦截）。因此 **mailbox 模式在拉取前必须先预检**：
+
+- 预检两阶段：TCP 连到 `host:port`（超时 8s）→ imapflow 连接并 `list()`（超时 15s）。
+- 失败分类与话术：
+  - **端口不可达 / 超时**（`ETIMEDOUT`/`ECONNREFUSED`）：告诉用户"可能是公司网络或代理拦截了出站邮箱端口（993/143）。请切换到不受限网络（如手机热点）或按公司代理配置后重试。"
+  - **认证失败**：提示"邮箱账号或 IMAP 授权码不正确"，**不回显**任何凭据。
+  - **域名解析失败**（`ENOTFOUND`）：提示检查 IMAP 服务器地址。
+- `mode=both` 且预检失败：自动降级为只处理本地 inbox，并告警邮箱这次跳过。
+
+### 9.5 凭据安全（复述）
+- 密码/IMAP 授权码/JWT **绝不**写入 `sources.json`、`employee.json`、日志或对话回显。
+- 仅通过环境变量（默认 `REBU_IMAP_PASS`）或宿主 Secret Store 提供。
+- `setup.mjs --show` 打印配置时对敏感字段脱敏。
+
+### 9.6 与零依赖模式的关系
+- §七/§八的 `portable-core.mjs` 与 `scripts/collect.mjs` 仍是**零 npm 依赖**、纯逻辑路径，适合"宿主已提取文本"的场景。
+- 本节的 `scripts/local-collector/`（含 mailbox 抓取、二进制提取）复用仓库既有依赖（`imapflow`/`pdf-parse`/`adm-zip`/`tesseract.js`），适合"要端到端自动收票"的场景。二者共用同一 `portable-core` 与政策规则。

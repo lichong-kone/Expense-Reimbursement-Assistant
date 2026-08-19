@@ -36,6 +36,29 @@
     "verifyBundle": "template-adapter/install-or-verify.mjs",
     "bundle": "template-adapter/bundle.mjs --template-input <path> [--output-dir <dir>]"
   },
+  "datasource": {
+    "note": "Local datasource + onboarding entry points (Spec §6.8.6.11–12). Fixed scripts for setup/precheck/collect so the host Agent does not improvise.",
+    "modes": ["local", "mailbox", "both"],
+    "requiresDeps": ["imapflow", "pdf-parse", "adm-zip", "tesseract.js"],
+    "credentials": "IMAP password/auth-code via env var only (default REBU_IMAP_PASS) or host Secret Store; never persisted to config or logs.",
+    "entryPoints": {
+      "setup": {
+        "path": "../../scripts/local-collector/setup.mjs",
+        "cli": "--mode local|mailbox|both [--provider ...] [--name ...] [--mailbox-user ...] [--password-env VAR] [--print] [--show]",
+        "description": "Guided onboarding; persists sources.json + employee.json; never writes credentials."
+      },
+      "precheck": {
+        "path": "../../scripts/local-collector/index.mjs",
+        "cli": "--config <sources.json> --precheck",
+        "description": "Two-stage mailbox connectivity precheck with timeouts; reports corporate-network/proxy blocking."
+      },
+      "collect": {
+        "path": "../../scripts/local-collector/index.mjs",
+        "cli": "--config <sources.json> [--once|--watch <seconds>]",
+        "description": "End-to-end pipeline: mailbox fetch (with precheck) → extract → policy review → optional formal Excel."
+      }
+    }
+  },
   "inputs": [
     {
       "name": "input",
