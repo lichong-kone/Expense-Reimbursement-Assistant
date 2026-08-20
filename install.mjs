@@ -2,7 +2,7 @@
 /**
  * Expense Reimbursement Assistant — 跨平台 Skill 安装器（Node 版）
  *
- * 与 install.sh 等效，但 Windows / macOS / Linux 一条命令通用（只需 Node 18+）。
+ * Windows / macOS / Linux 一条命令通用（只需 Node 18+）。
  *
  * 用法：
  *   node install.mjs --host copilot          # 装到 Copilot CLI 的 skills 目录

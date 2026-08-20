@@ -15,7 +15,7 @@
 
 ## 安装
 
-安装就是把整个目录放到你的 Agent 宿主的 skills 目录（Kiro：`~/.kiro/skills/`；部分宿主：`~/.agents/skills/`；或用宿主自带的“导入 Skill”界面）。
+安装就是把整个目录放到你**实际使用的 Agent** 的 skills 目录，**不自动默认**任何一个：Copilot CLI 用 `~/.copilot/skills/`（或 `~/.agents/skills/`；也可 `copilot skill add <目录>`），Kiro 用 `~/.kiro/skills/`，Claude 用 `~/.claude/skills/`，也有宿主用自带的“导入 Skill”界面。
 
 ```bash
 cp -R kone-expense-reimbursement <你的宿主 skills 目录>/
