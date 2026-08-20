@@ -37,7 +37,7 @@ node install.mjs --skill service
   "mcpServers": {
     "rebu": {
       "command": "npx",
-      "args": ["-y", "https://metagentictool.com/downloads/rebu-mcp-1.1.3.tgz"],
+      "args": ["-y", "https://metagentictool.com/downloads/rebu-mcp-1.1.4.tgz"],
       "env": { "REBU_API_BASE": "https://metagentictool.com" }
     }
   }
