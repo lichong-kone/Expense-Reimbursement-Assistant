@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * Expense Reimbursement Assistant — 跨平台 Skill 安装器（Node 版）
+ * Skill 安装器（Node 版，跨平台：Windows / macOS / Linux 一条命令通用，只需 Node 18+）。
  *
- * Windows / macOS / Linux 一条命令通用（只需 Node 18+）。
+ * 通用 Skill 必须装到你**实际使用的 Agent** 的 skills 目录，本安装器**不自动默认**任何一个：
+ *   node install.mjs --host copilot    → ~/.copilot/skills   (GitHub Copilot CLI，也支持 ~/.agents/skills)
+ *   node install.mjs --host kiro       → ~/.kiro/skills      (Kiro)
+ *   node install.mjs --host claude     → ~/.claude/skills    (Claude)
+ *   node install.mjs --host agents     → ~/.agents/skills    (通用 .agents)
+ *   node install.mjs --dest <目录>     → 任意自定义 skills 目录
+ *   node install.mjs --skill service|both --host <agent>     选择要装的 Skill（默认 universal）
  *
- * 用法：
- *   node install.mjs --host copilot          # 装到 Copilot CLI 的 skills 目录
- *   node install.mjs --host kiro             # 装到 Kiro
- *   node install.mjs --host claude|agents    # 装到 Claude / 通用 .agents
- *   node install.mjs --dest <目录>           # 指定任意 skills 目录
- *   node install.mjs --skill service ...     # 装服务型 Skill（需另配 MCP）
+ * 同一份脚本兼容两种仓库布局：根目录 install.mjs（skills/ 同级）或 scripts/install-skill.mjs（skills/ 在上一级）。
  */
 
 import { existsSync, mkdirSync, cpSync } from 'node:fs';
@@ -18,7 +19,12 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_SRC = join(__dirname, 'skills');
+
+// Auto-locate the skills/ source dir for either layout (repo-root or scripts/).
+const SKILLS_SRC = existsSync(join(__dirname, 'skills'))
+  ? join(__dirname, 'skills')
+  : join(__dirname, '..', 'skills');
+const REPO_ROOT = dirname(SKILLS_SRC);
 
 const SKILL_MAP = {
   universal: 'kone-expense-reimbursement',
@@ -30,14 +36,13 @@ const SKILL_MAP = {
   'rebu-expense-agent': 'rebu-expense-agent',
 };
 
-// Per-host personal skills directory (relative to $HOME). A universal skill must
-// go under the Agent you actually run — there is no reliable way to guess that
-// from the filesystem, so we require --host/--dest instead of defaulting.
+// Per-host personal skills directory, relative to $HOME (joined with the
+// platform separator so Windows gets C:\Users\you\.copilot\skills etc.).
 const HOST_DIRS = {
-  copilot: '.copilot/skills',   // GitHub Copilot CLI (also supports ~/.agents/skills)
-  kiro:    '.kiro/skills',      // Kiro
-  claude:  '.claude/skills',    // Claude
-  agents:  '.agents/skills',    // 通用 AGENTS.md 生态（含 Copilot CLI）
+  copilot: ['.copilot', 'skills'],
+  kiro: ['.kiro', 'skills'],
+  claude: ['.claude', 'skills'],
+  agents: ['.agents', 'skills'],
 };
 
 function parseArgs(argv) {
@@ -54,17 +59,16 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Skill 安装器（Node 版，跨平台）
+  console.log(`Skill 安装器（Node 版，Windows / macOS / Linux 通用）
 
 选择你实际使用的 Agent（不同 Agent 的 skills 目录不同）：
-  node install.mjs --host copilot    → ~/.copilot/skills   (GitHub Copilot CLI)
-  node install.mjs --host kiro       → ~/.kiro/skills      (Kiro)
-  node install.mjs --host claude     → ~/.claude/skills    (Claude)
-  node install.mjs --host agents     → ~/.agents/skills    (通用 .agents)
-  node install.mjs --dest <目录>     → 任意自定义 skills 目录
+  --host copilot    → ~/.copilot/skills   (GitHub Copilot CLI)
+  --host kiro       → ~/.kiro/skills      (Kiro)
+  --host claude     → ~/.claude/skills    (Claude)
+  --host agents     → ~/.agents/skills    (通用 .agents)
+  --dest <目录>     → 任意自定义 skills 目录
 
-其它：
-  --skill universal|service|both     选择要装的 Skill（默认 universal）`);
+  --skill universal|service|both   选择要装的 Skill（默认 universal）`);
 }
 
 function fail(msg) { console.error(msg); process.exit(1); }
@@ -74,37 +78,32 @@ function resolveDest(dest, host) {
   if (process.env.REBU_SKILLS_DIR) return process.env.REBU_SKILLS_DIR;
   const home = homedir();
   if (host) {
-    const rel = HOST_DIRS[host.toLowerCase()];
-    if (!rel) fail(`未知 --host: ${host}（可用: ${Object.keys(HOST_DIRS).join(', ')}）`);
-    return join(home, ...rel.split('/'));
+    const rel = HOST_DIRS[String(host).toLowerCase()];
+    if (!rel) { console.error(`未知 --host: ${host}（可用: ${Object.keys(HOST_DIRS).join(', ')}）`); process.exit(2); }
+    return join(home, ...rel);
   }
-  // No explicit target: DO NOT guess a host. List options and stop, so a
-  // universal skill never lands under the wrong Agent (e.g. defaulting to Kiro).
-  const existing = Object.entries(HOST_DIRS)
-    .filter(([, rel]) => existsSync(join(home, rel.split('/')[0])))
-    .map(([name]) => name);
+  // No explicit target: never guess a host (a universal skill must not land
+  // under the wrong Agent). List the options and stop.
   fail(
-    '请指定要装到哪个 Agent 的 skills 目录（不同 Agent 目录不同，无法自动判断你在用哪个）：\n' +
-    '  Copilot CLI : node install.mjs --host copilot\n' +
-    '  Kiro        : node install.mjs --host kiro\n' +
-    '  Claude      : node install.mjs --host claude\n' +
-    '  通用 .agents: node install.mjs --host agents\n' +
-    '  自定义目录  : node install.mjs --dest <目录>' +
-    (existing.length ? `\n（本机已存在这些 Agent 目录：${existing.join(', ')}）` : ''),
+    '请指定要装到哪个 Agent 的 skills 目录（不同 Agent 目录不同，不自动默认）：\n' +
+    '  Copilot CLI : --host copilot\n' +
+    '  Kiro        : --host kiro\n' +
+    '  Claude      : --host claude\n' +
+    '  通用 .agents: --host agents\n' +
+    '  自定义目录  : --dest <目录>',
   );
 }
 
 function installOne(name, destDir) {
   const src = join(SKILLS_SRC, name);
-  if (!existsSync(src)) { console.error(`找不到 Skill 源目录: ${src}`); process.exit(1); }
+  if (!existsSync(src)) fail(`找不到 Skill 源目录: ${src}`);
   mkdirSync(destDir, { recursive: true });
   cpSync(src, join(destDir, name), { recursive: true });
   console.log(`  ✓ 已安装 ${name} → ${join(destDir, name)}`);
 }
 
 const args = parseArgs(process.argv);
-const target = SKILL_MAP[args.skill];
-if (!target && args.skill !== 'both' && args.skill !== 'all') {
+if (!SKILL_MAP[args.skill] && args.skill !== 'both' && args.skill !== 'all') {
   console.error(`未知 --skill 取值: ${args.skill}（可用: universal | service | both）`);
   process.exit(2);
 }
@@ -114,17 +113,27 @@ console.log('Skill 安装');
 console.log(`  源:   ${SKILLS_SRC}`);
 console.log(`  目标: ${destDir}\n`);
 
+const installedUniversal = args.skill === 'both' || args.skill === 'all' || SKILL_MAP[args.skill] === 'kone-expense-reimbursement';
 if (args.skill === 'both' || args.skill === 'all') {
   installOne('kone-expense-reimbursement', destDir);
   installOne('rebu-expense-agent', destDir);
 } else {
-  installOne(target, destDir);
+  installOne(SKILL_MAP[args.skill], destDir);
 }
 
 console.log('\n重启或刷新你的 Agent 宿主后即可发现该 Skill。');
-if (String(args.host).toLowerCase() === 'copilot' || /(?:^|\/)\.copilot\//.test(destDir)) {
+if (String(args.host).toLowerCase() === 'copilot' || destDir.includes('.copilot')) {
   console.log('Copilot CLI：在会话里执行 /skills reload，再用 /skills info kone-expense-reimbursement 确认。');
 }
-if (target === 'rebu-expense-agent' || args.skill === 'both' || args.skill === 'all') {
+if (SKILL_MAP[args.skill] === 'rebu-expense-agent' || args.skill === 'both' || args.skill === 'all') {
   console.log('服务型 Skill 还需按 README「类别一」配置 rebu MCP。');
+}
+
+// Optional: verify the controlled bundle when the universal skill's verifier exists.
+if (installedUniversal) {
+  const verify = join(SKILLS_SRC, 'kone-expense-reimbursement', 'template-adapter', 'install-or-verify.mjs');
+  if (existsSync(verify)) {
+    console.log('\n（可选）生成正式 Excel 前，可在仓库内校验受控 Bundle：');
+    console.log(`  node ${verify} --repo-root ${REPO_ROOT}`);
+  }
 }
