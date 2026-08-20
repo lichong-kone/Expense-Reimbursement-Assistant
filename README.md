@@ -25,10 +25,10 @@
 ```bash
 git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
-node install.mjs --skill service
+node install.mjs --skill service --host <你的 Agent>   # copilot | kiro | claude | agents
 ```
 
-自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装好后重启 Agent。**Windows / macOS / Linux 同一条命令**（用的是 Node，不是 bash）。
+`--host` 指定你**实际使用的 Agent**的 skills 目录（Copilot CLI → `~/.copilot/skills`；Kiro → `~/.kiro/skills`；Claude → `~/.claude/skills`；通用 → `~/.agents/skills`），或用 `--dest <目录>` 自定义。装好后重启 Agent（Copilot CLI 可在会话里 `/skills reload`）。**Windows / macOS / Linux 同一条命令**（Node，不是 bash）。
 
 **② 配 MCP：** 打开你 Agent 的配置文件（位置见下），把下面这段粘贴进去，保存后重启：
 
@@ -58,10 +58,10 @@ node install.mjs --skill service
 ```bash
 git clone https://github.com/lichong-kone/Expense-Reimbursement-Assistant.git
 cd Expense-Reimbursement-Assistant
-node install.mjs
+node install.mjs --host <你的 Agent>    # copilot | kiro | claude | agents
 ```
 
-自动装到 `~/.kiro/skills` 或 `~/.agents/skills`。装完重启 / 刷新 Agent。**Windows / macOS / Linux 同一条命令**（用的是 Node，不是 bash）。**不用配 MCP。**
+`--host` 指定你**实际使用的 Agent**的 skills 目录（Copilot CLI → `~/.copilot/skills`；Kiro → `~/.kiro/skills`；Claude → `~/.claude/skills`；通用 → `~/.agents/skills`），或 `--dest <目录>` 自定义。装完重启/刷新 Agent（Copilot CLI 在会话里 `/skills reload`，再 `/skills info kone-expense-reimbursement` 确认）。**Windows / macOS / Linux 同一条命令**（Node，不是 bash）。**不用配 MCP。**
 
 ## 用法
 
